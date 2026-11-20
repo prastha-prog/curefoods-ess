@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xSGCGZWeQOlQhei8Ikzjvxyp6AM2i/37i4MM11pNS/c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MzOnTwiKaXllTh+B1D8mCnoJG1QHsPxiz+kLWSa+a3Y='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -307,14 +307,10 @@ button{font-family:inherit}
 
     <div id="stepDob" hidden>
       <h1>First-time sign in</h1>
-      <p class="sent-to">Verify your identity for <b class="js-emp"></b> with the date of birth and the mobile number on your HR record.</p>
+      <p class="sent-to">Verify your identity for <b class="js-emp"></b> with the date of birth on your HR record.</p>
       <div class="lfield" id="dobField">
         <label>Date of birth</label>
         <div class="linput-row"><input id="dobInput" type="date" autocomplete="bday"></div>
-      </div>
-      <div class="lfield" id="mobField">
-        <label>Last 4 digits of your mobile number</label>
-        <div class="linput-row"><input id="mob4Input" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1234"></div>
       </div>
       <div class="lfield" id="codeField" hidden>
         <label>Setup code from HR</label>
@@ -586,17 +582,17 @@ $('pinBtn').onclick = function(){
 var useCode = false;
 $('codeToggle').onclick = function(){
   useCode = !useCode; err('dobError');
-  $('dobField').hidden = useCode; $('mobField').hidden = useCode; $('codeField').hidden = !useCode;
+  $('dobField').hidden = useCode; $('codeField').hidden = !useCode;
   $('codeToggle').textContent = useCode ? 'Use my date of birth instead' : 'Use a setup code from HR instead';
 };
 $('dobBtn').onclick = function(){
-  var dob=$('dobInput').value, m4=$('mob4Input').value.trim(), code=$('codeInput').value.trim(); err('dobError');
+  var dob=$('dobInput').value, code=$('codeInput').value.trim(); err('dobError');
   if(useCode){ if(!/^\d{8}$/.test(code)) return err('dobError','Enter the 8-digit setup code HR gave you.'); }
-  else { if(!dob) return err('dobError','Select your date of birth.'); if(LIVE && !/^\d{4}$/.test(m4)) return err('dobError','Enter the last 4 digits of your mobile number.'); }
+  else { if(!dob) return err('dobError','Select your date of birth.'); }
   var btn=$('dobBtn'); busy(btn,true,'Verifying…');
-  Auth.verifyDob(s.empCode,dob,m4,useCode?code:'').then(function(r){
+  Auth.verifyDob(s.empCode,dob,'',useCode?code:'').then(function(r){
     if(!r.ok) return err('dobError', r.error || ('That doesn’t match your HR record. '+r.left+' attempt'+(r.left===1?'':'s')+' left. If your date of birth is wrong in HR records, contact your HR partner.'));
-    s.setupToken=r.setupToken; s.dob=r.dob||dob; $('dobInput').value=''; $('mob4Input').value=''; $('codeInput').value=''; clearPins(); show('stepSet');
+    s.setupToken=r.setupToken; s.dob=r.dob||dob; $('dobInput').value=''; $('codeInput').value=''; clearPins(); show('stepSet');
   }).catch(netFail('dobError')).then(function(){ busy(btn,false,'Verify'); });
 };
 
