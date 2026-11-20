@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-e0CTFJmRAQ2+wymDxt3jLfYCxylOy6d3S5362h6V2IU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tWqQ5M30wLIVnoI2z/q2h+OkV47AERYNqqTk/lweyuc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -931,15 +931,17 @@ function impState(){ try{ return JSON.parse(sessionStorage.getItem('cf_imp')||'n
 function setImpState(v){ ui.impMem=v; try{ if(v) sessionStorage.setItem('cf_imp', JSON.stringify(v)); else sessionStorage.removeItem('cf_imp'); }catch(e){} }
 function readOnly(){
   var st=impState(); if(!st) return false;
-  if(Date.now()>st.until){ toast('View-as session expired'); exitViewAs(); return true; }
+  if(Date.now()>st.until){ toast('Session expired'); exitViewAs(); return true; }
+  if(st.rw) return false;          // act-as: the server decides what is allowed and logs it under the admin
   toast('Read-only: you are viewing as '+(me&&me['Employee Name'])+' \u2014 exit to make changes'); return true;
 }
 function viewAsHTML(){
   return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>View as Employee</h2></div>'+
-    '<div class="panel"><div class="note">Open any employee’s portal without their PIN to check what they see or help with an issue. The view is <b>read-only</b>, expires in '+IMP_MINUTES+' minutes, and is logged with your name and reason.</div>'+
+    '<div class="panel"><div class="note">Open any employee’s portal without their date of birth or PIN. Choose a read-only look, or tick <b>Allow changes</b> to act as them (raise tickets, apply to jobs). It expires in '+IMP_MINUTES+' minutes. Everything you do is logged under <b>your</b> name and reason. You cannot change their PIN, issue setup codes, or see their confidential (POSH) tickets.</div>'+
     '<div class="f"><label>Employee ID</label><input id="vaId" placeholder="Employee ID" autocapitalize="characters"></div>'+
     '<div class="f"><label>Reason (logged)</label><input id="vaReason" placeholder="e.g. Ticket HD-1042 — payslip not showing"></div>'+
-    '<p class="lerror" id="vaErr"></p><button class="btn" id="vaGo" style="width:100%;padding:12px">Start read-only view</button></div>';
+    '<label style="display:flex;gap:10px;align-items:center;margin:4px 0 10px"><input type="checkbox" id="vaWrite"> <span>Allow changes (act as this employee)</span></label>'+
+    '<p class="lerror" id="vaErr"></p><button class="btn" id="vaGo" style="width:100%;padding:12px">Open employee portal</button></div>';
 }
 function bindViewAs(){
   $('vaGo').onclick=function(){
@@ -949,10 +951,10 @@ function bindViewAs(){
     if(code===myCode()) return err('vaErr','That’s your own ID.');
     var admin=me;
     if(LIVE){
-      api({action:'impersonate', session:session(), empCode:code, reason:reason}).then(function(r){
+      var wr=!!$('vaWrite').checked; api({action:'impersonate', session:session(), empCode:code, reason:reason, write:wr}).then(function(r){
         if(!r.ok) return err('vaErr', r.error||'Could not open that account.');
         try{ sessionStorage.setItem('cf_admin_session', session()); sessionStorage.setItem('cf_session', r.session); }catch(e){}
-        setImpState({by:admin['Employee Code'], byName:admin['Employee Name'], until:Date.now()+IMP_MINUTES*60000});
+        setImpState({by:admin['Employee Code'], byName:admin['Employee Name'], until:Date.now()+IMP_MINUTES*60000, rw:!!r.rw});
         enter(r.employee);
       }).catch(function(){ err('vaErr','Could not reach the server.'); });
       return;
@@ -982,7 +984,7 @@ function paintImpBanner(){
   var st=impState(), b=$('impBanner');
   if(!st){ b.hidden=true; return; }
   b.hidden=false;
-  b.innerHTML='<span>Viewing as <b>'+esc(me['Employee Name'])+'</b> ('+esc(me['Employee Code'])+') · read-only · by '+esc(st.byName)+'</span><button id="impExit">Exit</button>';
+  b.innerHTML='<span>'+(st.rw?'Acting as':'Viewing as')+' <b>'+esc(me['Employee Name'])+'</b> ('+esc(me['Employee Code'])+') \u00b7 '+(st.rw?'changes are logged under your name':'read-only')+' \u00b7 by '+esc(st.byName)+'</span><button id="impExit">Exit</button>';
   $('impExit').onclick=exitViewAs;
 }
 
