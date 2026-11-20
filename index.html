@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-xSGCGZWeQOlQhei8Ikzjvxyp6AM2i/37i4MM11pNS/c='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -307,13 +307,22 @@ button{font-family:inherit}
 
     <div id="stepDob" hidden>
       <h1>First-time sign in</h1>
-      <p class="sent-to">Verify your identity for <b class="js-emp"></b> with the date of birth on your HR record.</p>
-      <div class="lfield">
+      <p class="sent-to">Verify your identity for <b class="js-emp"></b> with the date of birth and the mobile number on your HR record.</p>
+      <div class="lfield" id="dobField">
         <label>Date of birth</label>
         <div class="linput-row"><input id="dobInput" type="date" autocomplete="bday"></div>
       </div>
+      <div class="lfield" id="mobField">
+        <label>Last 4 digits of your mobile number</label>
+        <div class="linput-row"><input id="mob4Input" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="1234"></div>
+      </div>
+      <div class="lfield" id="codeField" hidden>
+        <label>Setup code from HR</label>
+        <div class="linput-row"><input id="codeInput" type="text" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="8-digit code"></div>
+      </div>
       <p class="lerror" id="dobError"></p>
       <button class="lbtn" id="dobBtn">Verify</button>
+      <div class="lrow"><button class="lbtn ghost" id="codeToggle" type="button">Use a setup code from HR instead</button><span></span></div>
       <div class="lrow"><button class="lbtn ghost js-back">&larr; Change Employee ID</button><span></span></div>
     </div>
 
@@ -366,6 +375,16 @@ button{font-family:inherit}
 <div id="modalRoot"></div>
 <div id="toast"></div>
 <script>
+// ---- security guards ----
+if(window.top!==window.self){ try{ window.top.location=window.self.location; }catch(e){ document.documentElement.innerHTML=''; } }     // never render inside someone else's frame
+(function(){
+  var IDLE_MS = 15*60*1000, timer = null;
+  function bump(){ clearTimeout(timer); if(typeof me!=='undefined' && me) timer=setTimeout(function(){ if(me){ toast('Signed out after 15 minutes of inactivity.'); signOut(); } }, IDLE_MS); }
+  ['click','keydown','touchstart','scroll'].forEach(function(ev){ window.addEventListener(ev, bump, {passive:true}); });
+  setInterval(function(){ if(typeof me!=='undefined' && me && !timer) bump(); }, 30000);
+  window.addEventListener('pageshow', function(e){ if(e.persisted) location.reload(); });
+})();
+
 // ---- Employee Master lookup (sample rows, same column names as the real master) ----
 // Later this array is replaced by a backend call: GET ?action=lookup
 // which returns only the masked mobile — the full number never reaches the browser.
@@ -509,7 +528,7 @@ var DemoAuth = (function(){
 var LiveAuth = {
   start:function(code){ return api({action:'start', empCode:code}); },
   loginPin:function(code,pin){ return api({action:'loginPin', empCode:code, pin:pin}).then(keepSession); },
-  verifyDob:function(code,dob){ return api({action:'verifyDob', empCode:code, dob:dob}); },
+  verifyDob:function(code,dob,mob4,setupCode){ return api({action:'verifyDob', empCode:code, dob:dob, mob4:mob4, setupCode:setupCode}); },
   setPin:function(token,pin){ return api({action:'setPin', setupToken:token, pin:pin}).then(keepSession); },
   changePin:function(code,oldPin,newPin){ return api({action:'changePin', session:session(), oldPin:oldPin, newPin:newPin}); },
   status:function(code){ return api({action:'pinStatus', session:session(), empCode:code}); },
@@ -564,13 +583,20 @@ $('pinBtn').onclick = function(){
   }).catch(netFail('pinError')).then(function(){ busy(btn,false,'Sign in'); });
 };
 
+var useCode = false;
+$('codeToggle').onclick = function(){
+  useCode = !useCode; err('dobError');
+  $('dobField').hidden = useCode; $('mobField').hidden = useCode; $('codeField').hidden = !useCode;
+  $('codeToggle').textContent = useCode ? 'Use my date of birth instead' : 'Use a setup code from HR instead';
+};
 $('dobBtn').onclick = function(){
-  var dob=$('dobInput').value; err('dobError');
-  if(!dob) return err('dobError','Select your date of birth.');
+  var dob=$('dobInput').value, m4=$('mob4Input').value.trim(), code=$('codeInput').value.trim(); err('dobError');
+  if(useCode){ if(!/^\d{8}$/.test(code)) return err('dobError','Enter the 8-digit setup code HR gave you.'); }
+  else { if(!dob) return err('dobError','Select your date of birth.'); if(LIVE && !/^\d{4}$/.test(m4)) return err('dobError','Enter the last 4 digits of your mobile number.'); }
   var btn=$('dobBtn'); busy(btn,true,'Verifying…');
-  Auth.verifyDob(s.empCode,dob).then(function(r){
+  Auth.verifyDob(s.empCode,dob,m4,useCode?code:'').then(function(r){
     if(!r.ok) return err('dobError', r.error || ('That doesn’t match your HR record. '+r.left+' attempt'+(r.left===1?'':'s')+' left. If your date of birth is wrong in HR records, contact your HR partner.'));
-    s.setupToken=r.setupToken; s.dob=dob; clearPins(); show('stepSet');
+    s.setupToken=r.setupToken; s.dob=r.dob||dob; $('dobInput').value=''; $('mob4Input').value=''; $('codeInput').value=''; clearPins(); show('stepSet');
   }).catch(netFail('dobError')).then(function(){ busy(btn,false,'Verify'); });
 };
 
@@ -851,6 +877,19 @@ function bindPinReset(){
         '<div class="desc">'+esc(e['Designation']||'')+' · '+esc(e['Base location (Office)']||'')+'</div>'+
         '<div class="meta">'+(r.pinSetOn?'PIN set '+fmt(r.pinSetOn):'Has not set a PIN')+(r.resetOn?' · last reset '+fmt(r.resetOn)+' by '+esc(nameOf(r.resetBy)):'')+'</div></div>'+
         (r.hasPin||r.locked ? '<button class="btn" id="prReset" style="margin-top:12px">Reset PIN</button>' : '<p class="help" style="font-size:12px;color:var(--ink-faint);margin-top:10px">Nothing to reset — they’ll set a PIN on first sign-in using their date of birth.</p>');
+      if(LIVE){
+        var cb=document.createElement('button'); cb.className='btn sec'; cb.id='prCode'; cb.style.marginTop='12px'; cb.style.marginLeft='8px'; cb.textContent='Issue setup code'; $('prResult').appendChild(cb);
+        cb.onclick=function(){
+          modal('<h4>Issue a setup code for '+esc(e['Employee Name'])+'?</h4><p>Give the code only after you have verified this person yourself (in person or on a call). It works once, for 24 hours, and replaces the date of birth and mobile check at their first sign-in.</p>'+
+            '<div class="row"><button class="btn sec" id="mCancel">Cancel</button><button class="btn" id="mOk">Issue code</button></div>', function(){
+            $('mCancel').onclick=closeModal;
+            $('mOk').onclick=function(){ api({action:'issueSetupCode', session:session(), empCode:e['Employee Code']}).then(function(x){
+              if(!x.ok){ closeModal(); return toast(x.error||'Could not issue a code'); }
+              modal('<h4>Setup code for '+esc(e['Employee Name'])+'</h4><p style="font-family:var(--mono);font-size:28px;letter-spacing:.12em;margin:14px 0">'+esc(x.code)+'</p><p>Valid for '+esc(x.hours)+' hours, single use. Shown only now: it is not stored anywhere readable.</p><div class="row"><button class="btn" id="mCancel">Done</button></div>', function(){ $('mCancel').onclick=closeModal; });
+            }).catch(function(){ closeModal(); toast('Could not reach the server.'); }); };
+          });
+        };
+      }
       if($('prReset')) $('prReset').onclick=function(){
         modal('<h4>Reset PIN for '+esc(e['Employee Name'])+'?</h4><p>Confirm you’ve verified this request with the employee (call or in person). Their current PIN stops working immediately.</p>'+
           '<div class="row"><button class="btn sec" id="mCancel">Cancel</button><button class="btn" id="mOk">Reset PIN</button></div>', function(){
@@ -1169,10 +1208,10 @@ function listHTML(list, emptyMsg, showRaiser){
   if(!list.length) return '<div class="empty">'+emptyMsg+'</div>';
   return '<div class="tlist">'+list.map(function(t){
     var meta = showRaiser
-      ? esc(nameOf(t.raisedBy))+' ('+t.raisedBy+') · '+fmtDay(t.createdAt)+(me['Role']==='hrhead'?' · with '+esc(nameOf(t.assignedTo)):'')
+      ? esc(nameOf(t.raisedBy))+' ('+esc(t.raisedBy)+') · '+fmtDay(t.createdAt)+(me['Role']==='hrhead'?' · with '+esc(nameOf(t.assignedTo)):'')
       : 'Raised '+fmtDay(t.createdAt)+' · '+(t.status==='Closed'?'Closed '+fmtDay(t.closedAt):'With '+esc(nameOf(t.assignedTo)));
-    return '<button class="trow" data-ticket="'+t.id+'" data-search="'+esc((t.id+' '+nameOf(t.raisedBy)+' '+t.raisedBy+' '+t.description).toLowerCase())+'" data-cat="'+esc(t.category)+'">'+
-      '<div><div class="id">'+t.id+(t.files&&t.files.length?' · '+ICON_CLIP:'')+'</div><div class="cat">'+esc(t.category)+'</div></div>'+pill(t)+
+    return '<button class="trow" data-ticket="'+esc(t.id)+'" data-search="'+esc((t.id+' '+nameOf(t.raisedBy)+' '+t.raisedBy+' '+t.description).toLowerCase())+'" data-cat="'+esc(t.category)+'">'+
+      '<div><div class="id">'+esc(t.id)+(t.files&&t.files.length?' · '+ICON_CLIP:'')+'</div><div class="cat">'+esc(t.category)+'</div></div>'+pill(t)+
       '<div class="desc">'+esc(t.description)+'</div><div class="meta">'+meta+'</div></button>';
   }).join('')+'</div>';
 }
@@ -1208,10 +1247,10 @@ function ticketHTML(){
   var canAct = isHR(me) && t.status!=='Closed' && (t.assignedTo===myCode() || me['Role']==='hrhead');
   var due = t.createdAt + SLA_HOURS*3600000;
   var h = '<div class="crumb"><button class="iconbtn" data-go="helpdesk">'+ICON_BACK+'</button><h2>Ticket details</h2></div>';
-  h += '<div class="panel"><div class="dhead"><div><div class="id">'+t.id+'</div><h3>'+esc(t.category)+'</h3></div>'+pill(t)+'</div>';
+  h += '<div class="panel"><div class="dhead"><div><div class="id">'+esc(t.id)+'</div><h3>'+esc(t.category)+'</h3></div>'+pill(t)+'</div>';
   h += '<div class="kv">'+
     '<div><span>Raised by</span><b>'+esc(raiser['Employee Name']||t.raisedBy)+'</b></div>'+
-    '<div><span>Employee ID</span><b>'+t.raisedBy+'</b></div>'+
+    '<div><span>Employee ID</span><b>'+esc(t.raisedBy)+'</b></div>'+
     (isHR(me)?'<div><span>Designation</span><b>'+esc(raiser['Designation']||'—')+'</b></div><div><span>Location</span><b>'+esc(raiser['Base location (Office)']||'—')+'</b></div>':'')+
     '<div><span>Assigned HR</span><b>'+esc(nameOf(t.assignedTo))+'</b></div>'+
     '<div><span>Raised on</span><b>'+fmt(t.createdAt)+'</b></div>'+
@@ -1362,7 +1401,7 @@ function ijpRowHTML(r){
   return '<div class="ijp-row"><div class="ijp-main"><div class="n">'+esc(r.name)+'</div><div class="m">'+esc(r.state)+'</div></div>'+
     '<div class="ijp-open'+(r.open>=IJP_HOT?' hot':'')+'"><b>'+r.open+'</b><span>open</span></div>'+
     '<div class="ijp-act">'+(mine
-      ? '<span class="pill closed">Applied</span><button class="ijp-link" data-ijp-withdraw="'+mine.id+'">Withdraw</button>'
+      ? '<span class="pill closed">Applied</span><button class="ijp-link" data-ijp-withdraw="'+esc(mine.id)+'">Withdraw</button>'
       : '<button class="btn ijp-apply" data-ijp-apply="'+esc(r.code)+'">Apply</button>')+'</div></div>';
 }
 
@@ -1387,8 +1426,8 @@ function ijpAppRowHTML(a, forHR){
   var meta = 'Applied '+fmtDay(a.at)+(a.from?' · Rejoin from '+esc(a.from):'');
   return '<div class="ijp-app"><div>'+left+'<div class="m">'+mid+'</div><div class="m mono">'+meta+'</div>'+(a.note?'<div class="note-t">'+esc(a.note)+'</div>':'')+'</div>'+
     '<div class="ijp-appact">'+(forHR
-      ? '<select data-ijp-status="'+a.id+'" aria-label="Status for '+esc(a.name)+'">'+IJP_STATUSES.map(function(s){ return '<option'+(s===a.status?' selected':'')+'>'+s+'</option>'; }).join('')+'</select>'
-      : '<span class="pill '+pillCls+'">'+esc(a.status)+'</span>'+(a.status==='Closed'?'':'<button class="ijp-link" data-ijp-withdraw="'+a.id+'">Withdraw</button>'))+'</div></div>';
+      ? '<select data-ijp-status="'+esc(a.id)+'" aria-label="Status for '+esc(a.name)+'">'+IJP_STATUSES.map(function(s){ return '<option'+(s===a.status?' selected':'')+'>'+s+'</option>'; }).join('')+'</select>'
+      : '<span class="pill '+pillCls+'">'+esc(a.status)+'</span>'+(a.status==='Closed'?'':'<button class="ijp-link" data-ijp-withdraw="'+esc(a.id)+'">Withdraw</button>'))+'</div></div>';
 }
 function ijpMineHTML(){
   var list = ijpMine().sort(function(a,b){ return b.at-a.at; });
@@ -1537,7 +1576,7 @@ function bindTicket(){
     if(readOnly()) return;
     var opts = hrList().filter(function(h){return h['Employee Code']!==t.assignedTo;});
     modal('<h4>Assign to another HR</h4><p>Currently with '+esc(nameOf(t.assignedTo))+'.</p>'+
-      '<div class="f"><label>Assign to</label><select id="mHr">'+opts.map(function(h){return '<option value="'+h['Employee Code']+'">'+esc(h['Employee Name'])+' — '+esc(h['Designation']||'HR')+'</option>';}).join('')+'</select></div>'+
+      '<div class="f"><label>Assign to</label><select id="mHr">'+opts.map(function(h){return '<option value="'+esc(h['Employee Code'])+'">'+esc(h['Employee Name'])+' — '+esc(h['Designation']||'HR')+'</option>';}).join('')+'</select></div>'+
       '<div class="f"><label>Reason / handover note</label><textarea id="mNote" placeholder="Why is this being reassigned?"></textarea></div>'+
       '<div class="row"><button class="btn sec" id="mCancel">Cancel</button><button class="btn" id="mOk">Reassign</button></div>', function(){
         $('mCancel').onclick=closeModal;
@@ -1553,7 +1592,7 @@ function bindTicket(){
   };
   $('closeT').onclick=function(){
     if(readOnly()) return;
-    modal('<h4>Close ticket '+t.id+'</h4><p>The employee will see this resolution note in their ticket history.</p>'+
+    modal('<h4>Close ticket '+esc(t.id)+'</h4><p>The employee will see this resolution note in their ticket history.</p>'+
       '<div class="f"><label>Resolution</label><textarea id="mRes" placeholder="What was done to resolve this?">'+esc($('remark').value)+'</textarea></div>'+
       '<div class="row"><button class="btn sec" id="mCancel">Cancel</button><button class="btn ok" id="mOk">Close ticket</button></div>', function(){
         $('mCancel').onclick=closeModal;
