@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Rk376ybol+Xn8919iKvsZEnADTvHj+Rvy8Jy6tDjh0I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-b46XZ+iv1AxrS0BETJvhxIPEfTANilmiiBAMBAhnajc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -541,7 +541,7 @@ function netFail(id){ return function(){ err(id,'Could not reach the server. Che
 function applyBoot(b){
   TICKETS=b.tickets||[]; PEOPLE=b.people||{}; HR_LIST=b.hrs||[]; SNAP={};
   TICKETS.forEach(function(t){ SNAP[t.id]=JSON.stringify(t); });
-  IjpStore.set(b.ijpApps||[]); lastSync=Date.now();
+  IjpStore.set(b.ijpApps||[]); lastSync=Date.now(); ATS_ACCESS=b.ats||null;
 }
 function boot(){
   return Promise.all([api({action:'bootstrap', session:session()}), api({action:'ijpOpenings', session:session()})]).then(function(rs){
@@ -663,6 +663,13 @@ function openApply(id){
   });
 }
 $('jobsBtn').onclick = function(){ openCareers(); };
+var PAYSLIP_PUBLIC_URL = 'https://script.google.com/macros/s/AKfycbxRwpkJt1JzuqdA0kaFjhI9KLZVvXVe3fkkNtVJp9zPPxYkj_PvgLZSPEg4VX25ugwGsw/exec';
+$('alumniBtn').onclick = function(){
+  modal('<h4>Alumni</h4><p>The Alumni Portal is on its way. If you were a NAPS apprentice, you can still download your stipend slips with your Employee ID and date of birth.</p>'+
+    '<div class="row"><button class="btn sec" id="mCancel" type="button">Close</button><button class="btn" id="mOk" type="button">Download my stipend slip</button></div>', function(){
+    $('mCancel').onclick=closeModal; $('mOk').onclick=function(){ window.open(PAYSLIP_PUBLIC_URL,'_blank','noopener'); closeModal(); };
+  });
+};
 
 // ===================== EMPLOYEE MASTER — extra profile columns (sample) =====================
 // Same column names as the real Employee Master export, so swapping in the real sheet needs no mapping.
@@ -747,7 +754,7 @@ function cacheFor(){ if(docCache.who!==myCode()){ docCache={who:myCode(), offers
 function loadInto(key, fn){
   var c=cacheFor(); if(c[key]) return c[key];
   c[key]={loading:true};
-  fn().then(function(r){ c[key]= r.ok ? {items:r.items||[]} : {error:r.error||'Could not load.'}; })
+  fn().then(function(r){ c[key]= r.ok ? {items:r.items||[], warn:r.warn||''} : {error:r.error||'Could not load.'}; })
       .catch(function(){ c[key]={error:'Could not reach the server.'}; })
       .then(function(){ if(docCache===c) render(); });
   return c[key];
@@ -772,6 +779,7 @@ function offerListHTML(){
   var st=loadInto('offers', Docs.offers);
   if(st.loading) return h+LOADING_HTML;
   if(st.error) return h+'<div class="empty">'+esc(st.error)+'</div>';
+  if(st.warn && !st.items.length) return h+'<div class="empty">'+esc(st.warn)+'<br><br><button class="btn" data-raise="Payroll & Salary">Ask HR for help</button></div>';
   var rows=st.items.slice().sort(function(a,b){ return String(b['Generated On']).localeCompare(String(a['Generated On'])); });
   if(!rows.length) return h+'<div class="empty">No offer letter matched your mobile number and date of birth. This usually happens if your number changed after the offer was issued, or the letter was issued before the online tool.<br><br><button class="btn" data-raise="Letters & Documents">Request it from HR</button></div>';
   return h+'<div class="tlist">'+rows.map(function(o,i){
@@ -815,6 +823,7 @@ function payslipListHTML(){
   var st=loadInto('slips', Docs.payslips);
   if(st.loading) return h+LOADING_HTML;
   if(st.error) return h+'<div class="empty">'+esc(st.error)+'</div>';
+  if(st.warn && !st.items.length) return h+'<div class="empty">'+esc(st.warn)+'<br><br><button class="btn" data-raise="Payroll & Salary">Ask HR for help</button></div>';
   var rows=st.items.slice().sort(function(a,b){ return slipKey(b).localeCompare(slipKey(a)); });
   if(!rows.length) return h+'<div class="empty">No payslips are published for your Employee ID yet. NAPS stipend slips appear here once payroll generates them; regular salary payslips will be added next.<br><br><button class="btn" data-raise="Payroll & Salary">Ask HR about a payslip</button></div>';
   return h+'<div class="note">'+esc(rows[0]['Entity']||'')+(rows[0]['Apprenticeship Code']?' · Apprenticeship code <b>'+esc(rows[0]['Apprenticeship Code'])+'</b>':'')+'</div><div class="tlist">'+rows.map(function(x){
@@ -939,13 +948,332 @@ function readOnly(){
   toast('Read-only: you are viewing as '+(me&&me['Employee Name'])+' \u2014 exit to make changes'); return true;
 }
 function viewAsHTML(){
-  return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>View as Employee</h2></div>'+
+  return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Access any employee</h2></div>'+
     '<div class="panel"><div class="note">Open any employee’s portal without their date of birth or PIN. Choose a read-only look, or tick <b>Allow changes</b> to act as them (raise tickets, apply to jobs). It expires in '+IMP_MINUTES+' minutes. Everything you do is logged under <b>your</b> name and reason. You cannot change their PIN, issue setup codes, or see their confidential (POSH) tickets.</div>'+
     '<div class="f"><label>Employee ID</label><input id="vaId" placeholder="Employee ID" autocapitalize="characters"></div>'+
     '<div class="f"><label>Reason (logged)</label><input id="vaReason" placeholder="e.g. Ticket HD-1042 — payslip not showing"></div>'+
     '<label style="display:flex;gap:10px;align-items:center;margin:4px 0 10px"><input type="checkbox" id="vaWrite"> <span>Allow changes (act as this employee)</span></label>'+
     '<p class="lerror" id="vaErr"></p><button class="btn" id="vaGo" style="width:100%;padding:12px">Open employee portal</button></div>';
 }
+
+// ===================== OFFER LETTERS (HR) =====================
+// The salary is solved and the letter is filled on the SERVER (same engine, templates, Drive folder and log as the Offer Letter tool).
+// This screen only collects the details; the numbers shown in the preview are re-derived by the server when you generate.
+function ogS(){ if(!ui.og) ui.og={cfg:null, entity:'', type:'', step:'form', v:{}, sal:null, choice:'primary', busy:false}; return ui.og; }
+function ogEnt(){ var og=ogS(); return og.cfg && og.cfg.entities.filter(function(e){ return e.key===og.entity; })[0]; }
+function ogF(id,label,ctl,span){ return '<div class="f"'+(span?' style="grid-column:1/-1"':'')+'><label for="'+id+'">'+label+'</label>'+ctl+'</div>'; }
+function ogIn(id,type,val,ph,extra){ return '<input id="'+id+'" type="'+type+'" value="'+esc(val||'')+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+(extra||'')+'>'; }
+function offerGenHTML(){
+  var og=ogS(), h='<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Generate Offer Letter</h2></div>';
+  if(!LIVE) return h+'<div class="panel"><div class="note">Offer generation works once the portal is connected to its backend.</div></div>';
+  if(!og.cfg) return h+'<div class="panel"><p class="hint">Loading your offer letter access…</p></div>';
+  if(og.cfg.error) return h+'<div class="panel"><div class="note">'+esc(og.cfg.error)+'</div></div>';
+  return h + (og.step==='preview' ? ogPreviewHTML() : ogFormHTML());
+}
+function ogFormHTML(){
+  var og=ogS(), v=og.v, ent=ogEnt(), t=og.type, c=og.cfg, h='<div class="panel">', FT=t==='Full Time Offer', NAPS=t==='NAPS LOI', BV=t==='BVoc LOI';
+  h+= c.entities.length>1
+    ? ogF('ogEntity','Company','<select id="ogEntity">'+c.entities.map(function(e){ return '<option value="'+esc(e.key)+'"'+(e.key===og.entity?' selected':'')+'>'+esc(e.companyName)+'</option>'; }).join('')+'</select>')
+    : '<p class="hint" style="margin:0 0 10px">'+esc(ent.companyName)+'</p>';
+  h+='<div class="f"><label id="ogTypeL">Letter type</label><div class="ijp-chips" role="group" aria-labelledby="ogTypeL">'+ent.letterTypes.map(function(x){ return '<button type="button" class="ijp-chip" aria-pressed="'+(x===t)+'" data-og-type="'+esc(x)+'">'+esc(x)+'</button>'; }).join('')+'</div></div>';
+  var opts='<option value="">Select…</option>'+['Unskilled','Skilled'].map(function(g){ return '<optgroup label="'+g+'">'+(c.designations[g]||[]).map(function(d){ return '<option'+(v.desig===d?' selected':'')+'>'+esc(d)+'</option>'; }).join('')+'</optgroup>'; }).join('')+'<option value="__other__"'+(v.desig==='__other__'?' selected':'')+'>Other…</option>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 14px;margin-top:10px">';
+  h+=ogF('ogName','Employee name *',ogIn('ogName','text',v.name,'Full name'));
+  h+=ogF('ogDesig','Designation *','<select id="ogDesig">'+opts+'</select>');
+  if(v.desig==='__other__'){
+    h+=ogF('ogCustom','Custom designation *',ogIn('ogCustom','text',v.custom,'e.g. Shift Lead'));
+    h+=ogF('ogCat','Minimum wage category *','<select id="ogCat"><option value="">Select…</option><option'+(v.cat==='Unskilled'?' selected':'')+'>Unskilled</option><option'+(v.cat==='Skilled'?' selected':'')+'>Skilled</option></select>');
+  }
+  h+=ogF('ogState','State'+(FT?' *':''),'<select id="ogState"><option value="">Select…</option>'+c.states.map(function(x){ return '<option'+(v.state===x?' selected':'')+'>'+esc(x)+'</option>'; }).join('')+'</select>');
+  h+=ogF('ogDoj','Date of joining *',ogIn('ogDoj','date',v.doj));
+  h+=ogF('ogDob','Date of birth',ogIn('ogDob','date',v.dob));
+  h+=ogF('ogLoc','Kitchen location',ogIn('ogLoc','text',v.loc,'e.g. Indiranagar, Bengaluru'));
+  h+=ogF('ogPhone','Phone number *',ogIn('ogPhone','tel',v.phone,'10-digit mobile',' inputmode="numeric"'));
+  h+=ogF('ogAlt','Alternate contact number',ogIn('ogAlt','tel',v.alt,'Optional',' inputmode="numeric"'));
+  h+=ogF('ogEmail','Candidate email *',ogIn('ogEmail','email',v.email,'candidate@email.com'));
+  h+=ogF('ogCc','CC email',ogIn('ogCc','text',v.cc,'Optional, comma separated'));
+  h+=ogF('ogMgr','Manager name',ogIn('ogMgr','text',v.mgr,'Reporting manager'));
+  if(BV) h+=ogF('ogSal','Salutation','<select id="ogSal"><option value="">Select…</option>'+['Mr','Ms','Mrs','Dr'].map(function(x){ return '<option'+(v.sal===x?' selected':'')+'>'+x+'</option>'; }).join('')+'</select>');
+  h+=ogF('ogAddr','Current address *','<textarea id="ogAddr" rows="2">'+esc(v.addr||'')+'</textarea>',true);
+  h+=ogF('ogPaddr','Permanent address','<textarea id="ogPaddr" rows="2" placeholder="If different from current">'+esc(v.paddr||'')+'</textarea>',true);
+  h+=ogF('ogNet', FT?'Desired net take-home (₹/month) *':NAPS?'NET salary (₹/month) *':'NET salary / stipend (₹/month) *', ogIn('ogNet','number',v.net,FT?'e.g. 20300':'',' min="1"'));
+  if(NAPS) h+=ogF('ogDbt','DBT amount (₹/month) *',ogIn('ogDbt','number',v.dbt,'e.g. 1500',' min="1"'));
+  h+='</div>';
+  if(FT) h+='<label style="display:flex;gap:10px;align-items:center;margin:4px 0"><input type="checkbox" id="ogPtOn"'+(v.ptOn?' checked':'')+'> <span>Use a fixed Professional Tax amount instead of the state slab</span></label>'+(v.ptOn?ogF('ogPt','Fixed PT (₹/month)',ogIn('ogPt','number',v.pt==null?200:v.pt,'',' min="0"')):'');
+  h+='<p class="lerror" id="ogErr" role="alert"></p><button class="btn" id="ogNext" type="button" style="width:100%;padding:12px">'+(FT?'Calculate and preview':'Preview')+'</button></div>';
+  return h;
+}
+function ogInr(n){ return '₹'+new Intl.NumberFormat('en-IN').format(Math.round(n||0)); }
+function ogPreviewHTML(){
+  var og=ogS(), v=og.v, ent=ogEnt(), t=og.type, r=og.sal ? (og.choice==='alternate'&&og.sal.alternate ? og.sal.alternate : og.sal.primary) : null;
+  var h='<div class="panel"><div class="note">Check the details. When you confirm, the offer letter is created and <b>emailed to '+esc(v.email)+'</b> straight away.</div>';
+  h+='<div class="dgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 14px;margin:12px 0">'+
+    [['Company',ent.companyName],['Letter',t],['Name',v.name],['Designation',v.desig==='__other__'?v.custom:v.desig],['State',v.state],['Joining',dLong(v.doj)],['Phone',v.phone],['Email',v.email],['CC',v.cc]].filter(function(x){ return x[1]; }).map(function(x){ return '<div><span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-faint)">'+x[0]+'</span><div><b>'+esc(x[1])+'</b></div></div>'; }).join('')+'</div>';
+  if(r){
+    if(og.sal.alternate){
+      var alt = og.sal.primaryLabel && og.sal.primaryLabel.indexOf('Below')===0 ? 'Above ₹21,000 wage threshold: no bonus or ESIC' : 'Below ₹21,000 wage threshold: bonus and ESIC active';
+      h+='<div class="note" style="margin-bottom:8px">Two exact solutions exist at the ₹21,000 wage threshold. Pick one.</div><div class="ijp-chips" role="group" aria-label="Salary option" style="margin-bottom:12px">'+
+        '<button type="button" class="ijp-chip" data-og-choice="primary" aria-pressed="'+(og.choice==='primary')+'">'+esc(og.sal.primaryLabel||'Option 1')+'</button><button type="button" class="ijp-chip" data-og-choice="alternate" aria-pressed="'+(og.choice==='alternate')+'">'+esc(alt)+'</button></div>';
+    }
+    var empPF=r.employerPF+(r.pfAdmin||0);
+    function row(a,m,b,bold,head){ return '<tr'+(bold?' style="font-weight:700"':'')+(head?' style="background:var(--line-soft);font-weight:700"':'')+'><td>'+a+'</td><td style="text-align:right">'+(m===undefined?'':ogInr(m))+'</td><td style="text-align:right">'+(m===undefined?'':ogInr(m*12))+'</td></tr>'; }
+    h+='<div style="overflow-x:auto"><table class="stbl og-t" style="width:100%"><thead><tr><th style="text-align:left">Component</th><th style="text-align:right">Per month</th><th style="text-align:right">Per year</th></tr></thead><tbody>'+
+      row('A. Salary components',undefined,0,0,1)+row('Basic',r.basic)+row('HRA',r.hra)+row('Special allowance',r.spl)+row('Statutory bonus',r.bonus)+row('Gross salary',r.gross,0,1)+
+      row("B. Employer's contribution",undefined,0,0,1)+row('Provident fund',empPF)+row('Employer ESI',r.employerESIC)+row('Insurance',r.insurance)+row('Gratuity',r.gratuity)+row('Cost to company',r.ctc,0,1)+
+      row('C. Deductions',undefined,0,0,1)+row('Provident fund (employee)',r.employeePF)+row('ESI (employee)',r.employeeESIC)+row('Professional tax',r.pt)+row('Food allowance',r.food)+row('Accommodation allowance',r.accom)+row('Total deduction',r.totalDeduction,0,1)+row('Take home',r.netPay,0,1)+'</tbody></table></div>';
+  } else if(t==='NAPS LOI'){
+    h+='<table class="stbl" style="width:100%"><tbody><tr><td>Total stipend (NET)</td><td style="text-align:right">'+ogInr(v.net)+'</td></tr><tr><td>Government DBT share</td><td style="text-align:right">'+ogInr(v.dbt)+'</td></tr><tr style="font-weight:700"><td>Company share</td><td style="text-align:right">'+ogInr(v.net-v.dbt)+'</td></tr></tbody></table>';
+  } else h+='<table class="stbl" style="width:100%"><tbody><tr style="font-weight:700"><td>Stipend</td><td style="text-align:right">'+ogInr(v.net)+'</td></tr></tbody></table>';
+  h+='<p class="lerror" id="ogErr" role="alert"></p><div class="row" style="margin-top:14px"><button class="btn sec" id="ogBack" type="button">Back</button><button class="btn" id="ogGo" type="button">Generate and email the offer letter</button></div></div>';
+  return h;
+}
+function ogCollect(){
+  var v=ogS().v; function g(id){ var n=$(id); return n ? (n.type==='checkbox' ? n.checked : n.value.trim()) : undefined; }
+  var m={name:'ogName',desig:'ogDesig',custom:'ogCustom',cat:'ogCat',state:'ogState',doj:'ogDoj',dob:'ogDob',loc:'ogLoc',phone:'ogPhone',alt:'ogAlt',email:'ogEmail',cc:'ogCc',mgr:'ogMgr',sal:'ogSal',addr:'ogAddr',paddr:'ogPaddr',net:'ogNet',dbt:'ogDbt',ptOn:'ogPtOn',pt:'ogPt'};
+  Object.keys(m).forEach(function(k){ var x=g(m[k]); if(x!==undefined) v[k]=x; });
+}
+function ogFd(){
+  var og=ogS(), v=og.v;
+  return {employmentType:og.type, employeeName:v.name, designation:v.desig, customDesignation:v.custom, category:v.cat, dateOfJoining:v.doj, dateOfBirth:v.dob||'', state:v.state||'', kitchenLocation:v.loc||'',
+    phoneNumber:v.phone, alternateContactNumber:v.alt||'', email:v.email, cc:v.cc||'', managerName:v.mgr||'', address:v.addr, permanentAddress:v.paddr||'', salutation:v.sal||'',
+    ptOverrideEnabled:!!v.ptOn, ptOverrideValue:v.ptOn?Number(v.pt==null?200:v.pt):'', netSalary:Number(v.net)||0, dbtAmount:og.type==='NAPS LOI'?(Number(v.dbt)||0):0};
+}
+function ogValidate(){
+  var og=ogS(), v=og.v, t=og.type;
+  if(!v.name) return 'Employee name is required.';
+  if(!v.desig) return 'Designation is required.';
+  if(v.desig==='__other__'){ if(!v.custom) return 'Custom designation is required.'; if(!v.cat) return 'Choose the minimum wage category for a custom designation.'; }
+  if(!v.doj) return 'Date of joining is required.';
+  if(String(v.phone||'').replace(/\D/g,'').length<10) return 'A 10-digit phone number is required.';
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email||'')) return 'A valid candidate email is required.';
+  if(!v.addr) return 'Current address is required.';
+  if(t==='Full Time Offer'){ if(!v.state) return 'State is required for a Full Time Offer.'; if(!(Number(v.net)>=1000)) return 'Enter a valid net take-home (at least ₹1,000).'; }
+  else if(t==='NAPS LOI'){ if(!(Number(v.net)>=1)) return 'NET salary is required.'; if(!(Number(v.dbt)>=1)) return 'DBT amount is required.'; if(Number(v.dbt)>Number(v.net)) return 'DBT cannot be more than the NET salary.'; }
+  else if(!(Number(v.net)>=1)) return 'NET salary / stipend is required.';
+  return '';
+}
+function bindOfferGen(){
+  var og=ogS(), v=$('view');
+  if(!og.cfg){
+    api({action:'offerConfig', session:session()}).then(function(r){
+      og.cfg = r.ok ? r : {error:r.error||'Could not load offer letter access.'};
+      if(r.ok){ og.entity=og.entity||r.entities[0].key; og.type=og.type||ogEnt().letterTypes[0]; }
+      render();
+    }).catch(function(){ og.cfg={error:'Could not reach the server.'}; render(); });
+    return;
+  }
+  if(og.cfg.error) return;
+  [].forEach.call(v.querySelectorAll('[data-og-type]'),function(b){ b.onclick=function(){ ogCollect(); og.type=b.dataset.ogType; render(); }; });
+  [].forEach.call(v.querySelectorAll('[data-og-choice]'),function(b){ b.onclick=function(){ og.choice=b.dataset.ogChoice; render(); }; });
+  if($('ogEntity')) $('ogEntity').onchange=function(){ ogCollect(); og.entity=this.value; var lt=ogEnt().letterTypes; if(lt.indexOf(og.type)<0) og.type=lt[0]; render(); };
+  if($('ogDesig')) $('ogDesig').onchange=function(){ ogCollect(); render(); };
+  if($('ogPtOn')) $('ogPtOn').onchange=function(){ ogCollect(); render(); };
+  if($('ogNext')) $('ogNext').onclick=function(){
+    ogCollect(); err('ogErr'); var e=ogValidate(); if(e) return err('ogErr', e);
+    if(og.type!=='Full Time Offer'){ og.sal=null; og.step='preview'; render(); window.scrollTo(0,0); return; }
+    var b=$('ogNext'); busy(b,true,'Calculating…');
+    api({action:'offerPreview', session:session(), entity:og.entity, fd:ogFd()}).then(function(r){
+      busy(b,false,'Calculate and preview'); if(!r.ok) return err('ogErr', r.error||'Could not calculate.');
+      og.sal=r.sal; og.choice='primary'; og.step='preview'; render(); window.scrollTo(0,0);
+    }).catch(function(){ busy(b,false,'Calculate and preview'); err('ogErr','Could not reach the server.'); });
+  };
+  if($('ogBack')) $('ogBack').onclick=function(){ og.step='form'; render(); };
+  if($('ogGo')) $('ogGo').onclick=function(){
+    modal('<h4>Send this offer letter?</h4><p>The letter for <b>'+esc(og.v.name)+'</b> will be created and emailed to <b>'+esc(og.v.email)+'</b>'+(og.v.cc?' (cc '+esc(og.v.cc)+')':'')+' now. This cannot be undone.</p><div class="row"><button class="btn sec" id="mCancel" type="button">Cancel</button><button class="btn" id="mOk" type="button">Generate and send</button></div>', function(){
+      $('mCancel').onclick=closeModal;
+      $('mOk').onclick=function(){
+        var ok=$('mOk'); busy(ok,true,'Generating…'); $('mCancel').disabled=true;
+        api({action:'offerGenerate', session:session(), entity:og.entity, fd:ogFd(), choice:og.choice, candidateId:og.candidateId||''}).then(function(r){
+          if(!r.ok){ closeModal(); return err('ogErr', r.error||'The offer could not be generated.'); }
+          var name=r.employeeName, to=r.emailedTo; ui.og=null; closeModal();
+          if(r.base64){
+            var bin=atob(r.base64), arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+            var url=URL.createObjectURL(new Blob([arr],{type:'application/pdf'}));
+            modal('<h4>Offer letter sent</h4><p>Emailed to <b>'+esc(to)+'</b> for '+esc(name)+'. It is also saved in the offer letter folder and logged.</p><iframe title="Offer letter preview" src="'+url+'" style="width:100%;height:55vh;border:1px solid var(--line);border-radius:8px"></iframe>'+
+              '<div class="row" style="margin-top:12px"><a class="btn sec" href="'+url+'" download="Offer letter - '+esc(name)+'.pdf" style="text-decoration:none">Download PDF</a><button class="btn" id="mCancel" type="button">Done</button></div>', function(){ $('mCancel').onclick=function(){ closeModal(); render(); }; });
+          } else { toast('Offer letter sent to '+to); render(); }
+        }).catch(function(){ closeModal(); err('ogErr','Could not reach the server. Check the offer log before trying again.'); });
+      };
+    });
+  };
+}
+
+
+// ===================== RECRUITMENT (ATS) =====================
+// Who may see what is decided on the SERVER (recruiter = HR / admin, hiring manager = named on a job, interviewer = named on an interview).
+// This screen only shows what the server sent.
+var ICON_ATS = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5"/><path d="M16 4.6a3.4 3.4 0 0 1 0 6.3M21.5 20c0-2.7-1.6-4.4-4-5.2"/></svg>';
+function atsOK(){ return !!(LIVE && me && !impState() && ATS_ACCESS && (ATS_ACCESS.recruiter || ATS_ACCESS.hm || ATS_ACCESS.interviewer)); }
+function atS(){ if(!ui.at) ui.at={tab:null, data:null, loading:false, err:'', job:'', stage:'Applied'}; return ui.at; }
+function atN(code){ var d=atS().data, p=d && d.people && d.people[code]; return p ? p['Employee Name'] : code; }
+function atsLoad(done){
+  var a=atS(); a.loading=true;
+  api({action:'atsBootstrap', session:session()}).then(function(r){
+    a.loading=false; if(r.ok){ a.data=r; a.err=''; } else { a.data=null; a.err=r.error||'Could not load recruitment.'; }
+    if(done) done(); render();
+  }).catch(function(){ a.loading=false; a.err='Could not reach the server.'; render(); });
+}
+function atsTabs(){
+  var acc=atS().data.access, t=[];
+  if(acc.recruiter||acc.hm){ t.push(['dash','Overview'],['jobs','Jobs'],['pipe','Pipeline']); }
+  t.push(['iv', acc.recruiter||acc.hm ? 'Interviews' : 'My interviews']); return t;
+}
+function atsPill(st){ var c = st==='Open'||st==='Hired'||st==='Done' ? 'closed' : st==='Rejected'||st==='Closed'||st==='Cancelled' ? 'over' : st==='Awaiting approval'||st==='On hold'||st==='Draft' ? 'open' : 'progress'; return '<span class="pill '+c+'">'+esc(st)+'</span>'; }
+function atsHTML(){
+  var a=atS(), h='<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Recruitment</h2></div>';
+  if(a.err) return h+'<div class="panel"><div class="note">'+esc(a.err)+'</div></div>';
+  if(!a.data) return h+'<div class="panel"><p class="hint">Loading recruitment…</p></div>';
+  var tabs=atsTabs(); if(!a.tab || !tabs.some(function(t){ return t[0]===a.tab; })) a.tab=tabs[0][0];
+  h+='<div class="tabs" role="tablist">'+tabs.map(function(t){ return '<button class="tab'+(t[0]===a.tab?' active':'')+'" role="tab" aria-selected="'+(t[0]===a.tab)+'" data-at-tab="'+t[0]+'">'+t[1]+'</button>'; }).join('')+'</div>';
+  return h + (a.tab==='dash'?atsDash():a.tab==='jobs'?atsJobs():a.tab==='pipe'?atsPipe():atsIvs());
+}
+function atsStat(label,val,sub){ return '<div class="panel" style="padding:14px"><div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-faint)">'+esc(label)+'</div><div style="font-size:26px;font-weight:700;margin-top:2px">'+esc(val)+'</div>'+(sub?'<div class="hint" style="margin:2px 0 0">'+esc(sub)+'</div>':'')+'</div>'; }
+function atsDash(){
+  var d=atS().data, c=d.candidates, byStage={}; d.stages.forEach(function(x){ byStage[x]=0; }); c.forEach(function(x){ byStage[x.stage]=(byStage[x.stage]||0)+1; });
+  var open=d.jobs.filter(function(j){ return j.status==='Open'; }).length, wait=d.jobs.filter(function(j){ return j.status==='Awaiting approval'; }).length;
+  var now=new Date().toISOString().slice(0,16), up=d.interviews.filter(function(i){ return i.status==='Scheduled' && i.when>=now; }).length, due=d.interviews.filter(function(i){ return i.status==='Scheduled' && i.when<now; }).length;
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">'+atsStat('Open jobs',open,wait?wait+' awaiting approval':'')+atsStat('Candidates',c.length-byStage.Rejected-byStage.Hired,'in the pipeline')+atsStat('Interviews',up,due?due+' awaiting feedback / update':'upcoming')+atsStat('Offers out',byStage.Offer,byStage.Hired+' hired')+'</div>';
+  h+='<div class="panel"><div class="note" style="margin-bottom:10px">Candidates by stage</div>'+d.stages.map(function(x){ var n=byStage[x]||0, w=c.length?Math.round(100*n/c.length):0;
+    return '<div style="display:grid;grid-template-columns:96px 1fr 28px;gap:8px;align-items:center;margin:6px 0;font-size:13px"><span>'+esc(x)+'</span><span style="background:var(--line-soft);border-radius:6px;height:10px;overflow:hidden"><span style="display:block;height:10px;width:'+w+'%;background:var(--sapphire)"></span></span><b style="text-align:right">'+n+'</b></div>'; }).join('')+'</div>';
+  return h;
+}
+function atsJobs(){
+  var d=atS().data, acc=d.access, jobs=d.jobs.filter(function(j){ return j.hm!==undefined; }), h='';
+  if(acc.recruiter) h+='<div class="row" style="margin:0 0 10px"><button class="btn" id="atJobNew" type="button">New job</button></div>';
+  if(!jobs.length) return h+'<div class="empty">No jobs yet.</div>';
+  h+=jobs.map(function(j){
+    var n=d.candidates.filter(function(c){ return c.job===j.id; }).length, me_=me['Employee Code'], isHm=j.hm===me_, a='';
+    if(j.status==='Awaiting approval' && (isHm || me['Is Admin'] || me['Role']==='hrhead')) a+='<button class="btn" data-at-js="'+esc(j.id)+'|Open" type="button">Approve and publish</button><button class="btn sec" data-at-js="'+esc(j.id)+'|Draft" type="button">Send back</button>';
+    if(j.status==='Open' && (acc.recruiter||isHm)) a+='<button class="btn sec" data-at-js="'+esc(j.id)+'|On hold" type="button">Hold</button>';
+    if(j.status==='On hold' && (acc.recruiter||isHm)) a+='<button class="btn sec" data-at-js="'+esc(j.id)+'|Open" type="button">Reopen</button>';
+    if(j.status==='Draft' && acc.recruiter && j.hm) a+='<button class="btn" data-at-js="'+esc(j.id)+'|Awaiting approval" type="button">Send for approval</button>';
+    if(j.status==='Closed' && acc.recruiter) a+='<button class="btn sec" data-at-js="'+esc(j.id)+'|Open" type="button">Reopen</button>';
+    if(['Closed'].indexOf(j.status)===-1 && (acc.recruiter||isHm)) a+='<button class="btn sec" data-at-js="'+esc(j.id)+'|Closed" type="button">Close</button>';
+    if(acc.recruiter && j.status!=='Closed') a+='<button class="btn sec" data-at-jedit="'+esc(j.id)+'" type="button">Edit</button>';
+    return '<div class="panel" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b>'+esc(j.title)+'</b><div class="hint" style="margin:2px 0">'+esc(j.id)+' · '+esc(j.dept)+' · '+esc(j.loc)+(j.type?' · '+esc(j.type):'')+(j.exp?' · '+esc(j.exp):'')+'</div>'+
+      '<div class="hint" style="margin:2px 0">Hiring manager: '+esc(j.hm?atN(j.hm):'not set')+' · '+j.openings+' opening'+(j.openings===1?'':'s')+' · '+n+' candidate'+(n===1?'':'s')+'</div></div>'+atsPill(j.status)+'</div>'+
+      (a?'<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">'+a+'<button class="btn sec" data-at-jp="'+esc(j.id)+'" type="button">Pipeline</button></div>':'<div class="row" style="margin-top:10px"><button class="btn sec" data-at-jp="'+esc(j.id)+'" type="button">Pipeline</button></div>')+'</div>';
+  }).join('');
+  return h;
+}
+function atsPipe(){
+  var a=atS(), d=a.data, jobs=d.jobs.filter(function(j){ return j.hm!==undefined; }), h='';
+  h+='<div class="f"><label for="atJob">Job</label><select id="atJob"><option value="">All jobs</option>'+jobs.map(function(j){ return '<option value="'+esc(j.id)+'"'+(a.job===j.id?' selected':'')+'>'+esc(j.title)+' ('+esc(j.id)+')</option>'; }).join('')+'</select></div>';
+  var list=d.candidates.filter(function(c){ return !a.job || c.job===a.job; }), cnt={}; d.stages.forEach(function(x){ cnt[x]=0; }); list.forEach(function(c){ cnt[c.stage]++; });
+  h+='<div class="ijp-chips" role="group" aria-label="Stage" style="margin:6px 0 12px">'+d.stages.map(function(x){ return '<button type="button" class="ijp-chip" aria-pressed="'+(a.stage===x)+'" data-at-stage="'+esc(x)+'">'+esc(x)+'<small>'+cnt[x]+'</small></button>'; }).join('')+'</div>';
+  var rows=list.filter(function(c){ return c.stage===a.stage; }).sort(function(x,y){ return String(y.updatedAt).localeCompare(String(x.updatedAt)); });
+  if(!rows.length) return h+'<div class="empty">No candidates at '+esc(a.stage)+'.</div>';
+  return h+rows.map(function(c){ var j=d.jobs.filter(function(x){ return x.id===c.job; })[0];
+    return '<button class="trow" data-at-cand="'+esc(c.id)+'" type="button"><div><div class="id">'+esc(c.id)+'</div><div class="cat">'+esc(c.name)+'</div></div>'+atsPill(c.stage)+'<div class="meta">'+esc(j?j.title:c.job)+' · '+esc(c.source||'')+' · applied '+fmtDay(c.appliedAt)+'</div></button>'; }).join('');
+}
+function atsIvs(){
+  var d=atS().data, now=new Date().toISOString().slice(0,16), list=d.interviews.slice().sort(function(x,y){ return String(x.when).localeCompare(String(y.when)); });
+  if(!list.length) return '<div class="empty">No interviews yet.</div>';
+  return list.map(function(i){
+    var c=d.candidates.filter(function(x){ return x.id===i.candidate; })[0], late=i.status==='Scheduled' && i.when<now, mineDue=i.interviewers.indexOf(me['Employee Code'])!==-1 && !i.mine && i.status!=='Cancelled';
+    return '<button class="trow" data-at-iv="'+esc(i.id)+'" type="button"><div><div class="id">'+esc(i.when.replace('T',' '))+' · '+esc(i.mode)+'</div><div class="cat">'+esc(i.round)+'</div></div>'+(mineDue?'<span class="pill over">Feedback due</span>':atsPill(late?'Scheduled':i.status))+
+      '<div class="meta">'+esc(c?c.name:i.candidate)+' · '+esc(i.interviewers.map(atN).join(', '))+' · feedback '+i.submitted+'/'+i.total+'</div></button>'; }).join('');
+}
+function atsJobModal(id){
+  var d=atS().data, j=id ? d.jobs.filter(function(x){ return x.id===id; })[0] : {title:'',dept:'',loc:'',type:'Full time',exp:'',openings:1,hm:'',skills:[],desc:''};
+  function f(i,l,c){ return '<div class="f"><label for="'+i+'">'+l+'</label>'+c+'</div>'; }
+  modal('<h4>'+(id?'Edit job':'New job')+'</h4>'+f('jtTitle','Job title *','<input id="jtTitle" value="'+esc(j.title)+'">')+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">'+f('jtDept','Department *','<input id="jtDept" value="'+esc(j.dept)+'">')+f('jtLoc','Location *','<input id="jtLoc" value="'+esc(j.loc)+'">')+
+    f('jtType','Type','<select id="jtType">'+['Full time','Contract','Intern'].map(function(x){ return '<option'+(j.type===x?' selected':'')+'>'+x+'</option>'; }).join('')+'</select>')+f('jtExp','Experience','<input id="jtExp" placeholder="e.g. 5 to 8 yrs" value="'+esc(j.exp||'')+'">')+
+    f('jtOpen','Openings','<input id="jtOpen" type="number" min="1" max="99" value="'+esc(j.openings||1)+'">')+f('jtHm','Hiring manager (Employee ID)','<input id="jtHm" autocapitalize="characters" value="'+esc(j.hm||'')+'">')+'</div>'+
+    f('jtSkills','Skills (comma separated)','<input id="jtSkills" value="'+esc((j.skills||[]).join(', '))+'">')+f('jtDesc','Description shown on the careers site','<textarea id="jtDesc" rows="4">'+esc(j.desc||'')+'</textarea>')+
+    '<p class="lerror" id="jtErr" role="alert"></p><div class="row"><button class="btn sec" id="jtCancel" type="button">Cancel</button><button class="btn sec" id="jtDraft" type="button">Save as draft</button><button class="btn" id="jtSend" type="button">Send for approval</button></div>', function(){
+    $('jtCancel').onclick=closeModal;
+    function save(send){
+      var job={id:id||'', title:$('jtTitle').value, dept:$('jtDept').value, loc:$('jtLoc').value, type:$('jtType').value, exp:$('jtExp').value, openings:$('jtOpen').value, hm:$('jtHm').value, skills:$('jtSkills').value, desc:$('jtDesc').value, send:send};
+      err('jtErr'); api({action:'atsJobSave', session:session(), job:job}).then(function(r){ if(!r.ok) return err('jtErr', r.error||'Could not save.'); closeModal(); toast(send?'Sent to the hiring manager for approval':'Saved as draft'); atsLoad(); }).catch(function(){ err('jtErr','Could not reach the server.'); });
+    }
+    $('jtDraft').onclick=function(){ save(false); }; $('jtSend').onclick=function(){ save(true); };
+  });
+}
+function atsCandModal(id){
+  api({action:'atsCandidate', session:session(), id:id}).then(function(r){
+    if(!r.ok) return toast(r.error||'Could not open the candidate.');
+    var c=r.candidate, d=atS().data, acc=d.access, P=r.candidate.people||{}; function nm(code){ return code==='system'?'System':(P[code]?P[code]['Employee Name']:atN(code)); }
+    var h='<h4>'+esc(c.name)+' '+atsPill(c.stage)+'</h4><p class="hint" style="margin:0 0 8px">'+esc(c.id)+' · '+esc(c.jobTitle)+' · '+esc(c.source||'')+' · applied '+fmtDay(c.appliedAt)+'</p>';
+    if(c.full){ h+='<div class="note" style="margin-bottom:8px">'+esc(c.email)+' · '+esc(c.phone)+'</div>'; }
+    if(c.resume) h+='<p style="margin:0 0 8px"><a href="'+esc(c.resume)+'" target="_blank" rel="noopener noreferrer">Open resume</a></p>';
+    if(c.full){
+      var st=d.stages.map(function(x){ var dis=!acc.recruiter && (x==='Offer'||x==='Hired'); return '<option'+(x===c.stage?' selected':'')+(dis?' disabled':'')+'>'+x+'</option>'; }).join('');
+      h+='<div class="f"><label for="cdStage">Stage</label><div style="display:flex;gap:8px"><select id="cdStage">'+st+'</select><button class="btn" id="cdMove" type="button">Move</button><button class="btn sec" id="cdReject" type="button">Reject…</button></div></div>';
+      h+='<div class="f"><label for="cdNote">Add a note</label><div style="display:flex;gap:8px"><textarea id="cdNote" rows="2"></textarea><button class="btn sec" id="cdAdd" type="button">Add</button></div></div>';
+      h+=(c.notes.length?'<div class="sec-h">Notes</div>'+c.notes.slice().reverse().map(function(n){ return '<div class="note" style="margin-bottom:6px"><b>'+esc(nm(n.by))+'</b> · '+fmtDay(n.at)+'<br>'+esc(n.text)+'</div>'; }).join(''):'');
+    }
+    h+='<div class="sec-h">Interviews</div>'+(c.interviews.length?c.interviews.map(function(i){ return '<button class="trow" data-at-iv2="'+esc(i.id)+'" type="button"><div><div class="id">'+esc(i.when.replace('T',' '))+'</div><div class="cat">'+esc(i.round)+'</div></div>'+atsPill(i.status)+'<div class="meta">'+esc(i.interviewers.map(function(x){ return nm(x); }).join(', '))+' · feedback '+i.submitted+'/'+i.total+'</div></button>'; }).join(''):'<p class="hint">None scheduled.</p>');
+    if(c.full) h+='<div class="row" style="margin:8px 0"><button class="btn sec" id="cdSched" type="button">Schedule interview</button>'+(acc.recruiter?'<button class="btn" id="cdOffer" type="button">Make offer</button>':'')+'</div>'+
+      '<div class="sec-h">Timeline</div><ul class="timeline">'+c.timeline.slice().reverse().map(function(t){ return '<li><div class="when">'+fmt(t.at)+' · '+esc(nm(t.by))+'</div><div class="what">'+esc(t.text)+'</div></li>'; }).join('')+'</ul>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn sec" id="cdClose" type="button">Close</button></div>';
+    modal(h, function(){
+      $('cdClose').onclick=closeModal;
+      [].forEach.call(document.querySelectorAll('[data-at-iv2]'),function(b){ b.onclick=function(){ closeModal(); atsIvModal(b.dataset.atIv2); }; });
+      if($('cdMove')) $('cdMove').onclick=function(){ var s2=$('cdStage').value; if(s2==='Rejected') return atsRejectModal(c); api({action:'atsMove', session:session(), id:c.id, stage:s2}).then(function(x){ if(!x.ok) return toast(x.error||'Could not move.'); closeModal(); toast('Moved to '+s2); atsLoad(); }); };
+      if($('cdReject')) $('cdReject').onclick=function(){ atsRejectModal(c); };
+      if($('cdAdd')) $('cdAdd').onclick=function(){ api({action:'atsNote', session:session(), id:c.id, text:$('cdNote').value}).then(function(x){ if(!x.ok) return toast(x.error||'Could not add the note.'); toast('Note added'); atsCandModal(c.id); }); };
+      if($('cdSched')) $('cdSched').onclick=function(){ atsSchedModal(c); };
+      if($('cdOffer')) $('cdOffer').onclick=function(){ ui.og={cfg:null, entity:'', type:'', step:'form', v:{name:c.name, email:c.email, phone:c.phone, desig:'__other__', custom:c.jobTitle}, sal:null, choice:'primary', busy:false, candidateId:c.id}; closeModal(); go('offergen'); };
+    });
+  }).catch(function(){ toast('Could not reach the server.'); });
+}
+function atsRejectModal(c){
+  modal('<h4>Reject '+esc(c.name)+'?</h4><div class="f"><label for="rjWhy">Reason (kept in the timeline)</label><input id="rjWhy" placeholder="e.g. Salary expectations too high"></div><p class="lerror" id="rjErr" role="alert"></p><div class="row"><button class="btn sec" id="mCancel" type="button">Cancel</button><button class="btn" id="mOk" type="button">Reject</button></div>', function(){
+    $('mCancel').onclick=function(){ atsCandModal(c.id); };
+    $('mOk').onclick=function(){ api({action:'atsMove', session:session(), id:c.id, stage:'Rejected', reason:$('rjWhy').value}).then(function(x){ if(!x.ok) return err('rjErr', x.error||'Could not reject.'); closeModal(); toast('Rejected'); atsLoad(); }); };
+  });
+}
+function atsSchedModal(c){
+  function f(i,l,x){ return '<div class="f"><label for="'+i+'">'+l+'</label>'+x+'</div>'; }
+  modal('<h4>Schedule an interview</h4><p class="hint" style="margin:0 0 8px">'+esc(c.name)+' · '+esc(c.jobTitle)+'</p>'+f('scRound','Round *','<input id="scRound" placeholder="e.g. Round 1 · Ops case">')+f('scWhen','Date and time (IST) *','<input id="scWhen" type="datetime-local">')+
+    f('scMode','Mode','<select id="scMode"><option>Video</option><option>Phone</option><option>In person</option></select>')+f('scLink','Meeting link (https)','<input id="scLink" placeholder="https://">')+f('scWho','Interviewers (Employee IDs, comma separated) *','<input id="scWho" autocapitalize="characters">')+
+    '<p class="lerror" id="scErr" role="alert"></p><div class="row"><button class="btn sec" id="mCancel" type="button">Back</button><button class="btn" id="mOk" type="button">Schedule</button></div>', function(){
+    $('mCancel').onclick=function(){ atsCandModal(c.id); };
+    $('mOk').onclick=function(){ var lk=$('scLink').value.trim(); if(lk==='https://') lk='';
+      api({action:'atsInterviewSave', session:session(), candidate:c.id, round:$('scRound').value, when:$('scWhen').value, mode:$('scMode').value, link:lk, interviewers:$('scWho').value}).then(function(x){
+        if(!x.ok) return err('scErr', x.error||'Could not schedule.'); closeModal(); toast('Interview scheduled'); atsLoad(); }).catch(function(){ err('scErr','Could not reach the server.'); }); };
+  });
+}
+var AT_CRIT = ['Role knowledge','Problem solving','Communication','Culture add'];
+function atsIvModal(id){
+  api({action:'atsCandidate', session:session(), id:(atS().data.interviews.filter(function(x){ return x.id===id; })[0]||{}).candidate}).then(function(r){
+    if(!r.ok) return toast(r.error||'Could not open the interview.');
+    var c=r.candidate, i=c.interviews.filter(function(x){ return x.id===id; })[0]; if(!i) return toast('Interview not found.');
+    var P=c.people||{}; function nm(code){ return P[code]?P[code]['Employee Name']:atN(code); }
+    var mineAllowed = i.interviewers.indexOf(me['Employee Code'])!==-1 && i.status!=='Cancelled';
+    var h='<h4>'+esc(i.round)+' '+atsPill(i.status)+'</h4><p class="hint" style="margin:0 0 8px">'+esc(c.name)+' · '+esc(c.jobTitle)+'</p><div class="note" style="margin-bottom:8px">'+esc(i.when.replace('T',' '))+' IST · '+esc(i.mode)+'<br>Interviewers: '+esc(i.interviewers.map(nm).join(', '))+(i.link?'<br><a href="'+esc(i.link)+'" target="_blank" rel="noopener noreferrer">Join the meeting</a>':'')+'</div>';
+    if(c.resume) h+='<p style="margin:0 0 8px"><a href="'+esc(c.resume)+'" target="_blank" rel="noopener noreferrer">Open resume</a></p>';
+    if(i.feedback&&i.feedback.length) h+='<div class="sec-h">Feedback</div>'+i.feedback.map(function(f){ return '<div class="note" style="margin-bottom:6px"><b>'+esc(nm(f.by))+'</b>: '+esc(f.rec)+'<br>'+Object.keys(f.scores).map(function(k){ return esc(k)+' '+f.scores[k]+'/5'; }).join(' · ')+(f.comment?'<br>'+esc(f.comment):'')+'</div>'; }).join('');
+    if(mineAllowed){
+      var sc=AT_CRIT.map(function(k,x){ return '<div class="f" style="margin:4px 0"><label for="fb'+x+'">'+k+'</label><select id="fb'+x+'" data-crit="'+esc(k)+'"><option value="">–</option>'+[1,2,3,4,5].map(function(n){ return '<option'+(i.mine&&i.mine.scores[k]===n?' selected':'')+'>'+n+'</option>'; }).join('')+'</select></div>'; }).join('');
+      h+='<div class="sec-h">'+(i.mine?'Your feedback (you can update it)':'Your feedback')+'</div>'+sc+'<div class="f"><label for="fbRec">Recommendation</label><select id="fbRec"><option value="">Select…</option>'+['Strong yes','Yes','No','Strong no'].map(function(x){ return '<option'+(i.mine&&i.mine.rec===x?' selected':'')+'>'+x+'</option>'; }).join('')+'</select></div><div class="f"><label for="fbTxt">Comments</label><textarea id="fbTxt" rows="3">'+esc(i.mine?i.mine.comment||'':'')+'</textarea></div><p class="lerror" id="fbErr" role="alert"></p>';
+    }
+    h+='<div class="row" style="margin-top:10px"><button class="btn sec" id="mCancel" type="button">Close</button>'+(mineAllowed?'<button class="btn" id="fbGo" type="button">Submit feedback</button>':'')+(c.full&&i.status==='Scheduled'?'<button class="btn sec" id="ivCancel" type="button">Cancel interview</button>':'')+'</div>';
+    modal(h, function(){
+      $('mCancel').onclick=closeModal;
+      if($('fbGo')) $('fbGo').onclick=function(){ var scores={}; [].forEach.call(document.querySelectorAll('[data-crit]'),function(s2){ if(s2.value) scores[s2.dataset.crit]=Number(s2.value); });
+        api({action:'atsFeedback', session:session(), id:i.id, scores:scores, rec:$('fbRec').value, comment:$('fbTxt').value}).then(function(x){ if(!x.ok) return err('fbErr', x.error||'Could not save.'); closeModal(); toast('Feedback saved'); atsLoad(); }); };
+      if($('ivCancel')) $('ivCancel').onclick=function(){ api({action:'atsInterviewStatus', session:session(), id:i.id, status:'Cancelled'}).then(function(x){ if(!x.ok) return toast(x.error||'Could not cancel.'); closeModal(); toast('Interview cancelled'); atsLoad(); }); };
+    });
+  }).catch(function(){ toast('Could not reach the server.'); });
+}
+function bindAts(){
+  var a=atS(), v=$('view');
+  if(!a.data && !a.err && !a.loading){ atsLoad(); return; }
+  if(!a.data) return;
+  [].forEach.call(v.querySelectorAll('[data-at-tab]'),function(b){ b.onclick=function(){ a.tab=b.dataset.atTab; render(); }; });
+  [].forEach.call(v.querySelectorAll('[data-at-stage]'),function(b){ b.onclick=function(){ a.stage=b.dataset.atStage; render(); }; });
+  if($('atJob')) $('atJob').onchange=function(){ a.job=this.value; render(); };
+  if($('atJobNew')) $('atJobNew').onclick=function(){ atsJobModal(''); };
+  [].forEach.call(v.querySelectorAll('[data-at-jedit]'),function(b){ b.onclick=function(){ atsJobModal(b.dataset.atJedit); }; });
+  [].forEach.call(v.querySelectorAll('[data-at-jp]'),function(b){ b.onclick=function(){ a.job=b.dataset.atJp; a.tab='pipe'; render(); }; });
+  [].forEach.call(v.querySelectorAll('[data-at-js]'),function(b){ b.onclick=function(){ var p=b.dataset.atJs.split('|'); api({action:'atsJobStatus', session:session(), id:p[0], status:p[1]}).then(function(r){ if(!r.ok) return toast(r.error||'Not allowed.'); toast(p[1]==='Open'?'Job is open':'Job updated'); atsLoad(); }); }; });
+  [].forEach.call(v.querySelectorAll('[data-at-cand]'),function(b){ b.onclick=function(){ atsCandModal(b.dataset.atCand); }; });
+  [].forEach.call(v.querySelectorAll('[data-at-iv]'),function(b){ b.onclick=function(){ atsIvModal(b.dataset.atIv); }; });
+}
+
 function bindViewAs(){
   $('vaGo').onclick=function(){
     var code=$('vaId').value.trim().toUpperCase(), reason=$('vaReason').value.trim(); err('vaErr');
@@ -1041,14 +1369,10 @@ var TICKETS = [];
 var ui = {view:'home', tab:null, ticketId:null, draftFiles:[]};
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-var PEOPLE = {}, HR_LIST = [], SNAP = {}, lastSync = 0;
+var PEOPLE = {}, HR_LIST = [], SNAP = {}, lastSync = 0, ATS_ACCESS = null;
 function empByCode(c){ return EMPLOYEE_MASTER.filter(function(r){return r['Employee Code']===c;})[0] || (LIVE ? PEOPLE[c] : null) || null; }
 function nameOf(c){ var e=empByCode(c); return e?e['Employee Name']:c; }
 function isHR(e){ return e && HR_ROLES.indexOf(e['Role'])!==-1; }
-// Offer-letter generation lives in the separate Apps Script web app (Curefoods Group Offer Letter Automation).
-// The portal only decides who SEES the entry point (HR Managers); the script itself re-checks its per-entity HR whitelist
-// on every call, so a hidden card is a convenience, never the security.
-var OFFER_TOOL_URL = 'https://script.google.com/macros/s/AKfycbxhXN90pAUT__aMGD1ffgwhyt1H-rwkgYdcHsVw6SwtbwGHfWU21Gnc7vpaydslybwwYw/exec';
 // Payslips are for NAPS apprentices only: their Employee Code starts with NAPS (same pattern as the NAPS register).
 function isNaps(e){ return !!e && /^NAPS/i.test(String(e['Employee Code']||'')); }
 function hrList(){ if(LIVE) return HR_LIST; return EMPLOYEE_MASTER.filter(function(e){ return isHR(e) && e['Employment Status']==='Active'; }); }
@@ -1141,7 +1465,10 @@ function signOut(){
   $('empIdInput').value=''; show('stepId');
 }
 function go(view, opts){
-  if((view==='payslips'||view==='slip') && !isNaps(me)) view='home';   // payslips: NAPS employees only
+  if((view==='payslips'||view==='slip') && !isNaps(me)) view='home';
+  if(view==='offergen' && !(isHR(me) && !impState())) view='home';
+  if(view==='ats' && !atsOK()) view='home';
+  if(view==='ats' && ui.view!=='ats') ui.at=null;       // HR Managers only, never inside an admin access session   // payslips: NAPS employees only
   ui.view=view; opts=opts||{};
   if(opts.tab) ui.tab=opts.tab;
   if(opts.ticketId) ui.ticketId=opts.ticketId;
@@ -1159,6 +1486,8 @@ function render(){
   else if(ui.view==='profile') v.innerHTML = profileHTML();
   else if(ui.view==='pinreset') v.innerHTML = pinResetHTML();
   else if(ui.view==='viewas') v.innerHTML = viewAsHTML();
+  else if(ui.view==='offergen') v.innerHTML = offerGenHTML();
+  else if(ui.view==='ats') v.innerHTML = atsHTML();
   else if(ui.view==='payslips') v.innerHTML = payslipListHTML();
   else if(ui.view==='slip') v.innerHTML = payslipViewHTML();
   else if(ui.view==='ijp') v.innerHTML = ijpHTML();
@@ -1172,11 +1501,12 @@ function homeHTML(){
     '<div class="cards">'+
       '<button class="mcard" data-go="helpdesk">'+(count?'<span class="badge">'+count+'</span>':'')+
         '<div class="ic">'+ICON_TICKET+'</div><div><div class="t">Raise Ticket</div><div class="s">'+sub+'</div></div></button>'+
-      (me['Is Admin'] && !impState()?'<button class="mcard" data-go="viewas"><div class="ic">'+ICON_EYE+'</div><div><div class="t">View as Employee</div><div class="s">Open any account, read-only</div></div></button>':'')+
+      (me['Is Admin'] && !impState()?'<button class="mcard" data-go="viewas"><div class="ic">'+ICON_EYE+'</div><div><div class="t">Access any employee</div><div class="s">Open any employee’s portal</div></div></button>':'')+
       (isHR(me) && !impState()?'<button class="mcard" data-go="pinreset"><div class="ic">'+ICON_KEY+'</div><div><div class="t">PIN Reset</div><div class="s">Reset an employee\u2019s sign-in PIN</div></div></button>':'')+
       '<button class="mcard" data-go="offer"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">My Offer Letter</div><div class="s">View your offer letter</div></div></button>'+
       '<button class="mcard" data-go="ijp"><div class="ic">'+ICON_JOB+'</div><div><div class="t">Internal Job Posting</div><div class="s">Open roles for returning employees</div></div></button>'+
-      (isHR(me) && !impState() ? '<button class="mcard" data-ext="'+esc(OFFER_TOOL_URL)+'"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Offer Letter</div><div class="s">Opens the offer letter tool</div></div></button>' : '')+
+      (atsOK() ? '<button class="mcard" data-go="ats"><div class="ic">'+ICON_ATS+'</div><div><div class="t">Recruitment</div><div class="s">Jobs, candidates, interviews</div></div></button>' : '')+
+      (isHR(me) && !impState() ? '<button class="mcard" data-go="offergen"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Offer Letter</div><div class="s">Create and email an offer letter</div></div></button>' : '')+
       (isNaps(me) ? '<button class="mcard" data-go="payslips"><div class="ic">'+ICON_SLIP+'</div><div><div class="t">Payslips</div><div class="s">Monthly payslips & stipend slips</div></div></button>' : '')+
 
     '</div>';
@@ -1267,8 +1597,12 @@ function ticketHTML(){
       '<button class="btn sec" id="reassign">Assign to another HR</button>'+
       '<button class="btn ok" id="closeT">Close ticket</button></div>';
   }
+  if(LIVE && !canAct && t.raisedBy===myCode() && !impState()){
+    if(t.status!=='Closed') h += '<div class="sec-h">Reply to HR</div><div class="f" style="margin-bottom:10px"><label for="replyTxt">Your message</label><textarea id="replyTxt" placeholder="Add more detail or ask for an update"></textarea></div><div class="actions"><button class="btn" id="sendReply" type="button">Send reply</button></div>';
+    else if(t.closedAt && Date.now()-t.closedAt < 7*86400000) h += '<div class="sec-h">Not resolved?</div><div class="actions"><button class="btn sec" id="reopenT" type="button">Reopen this ticket</button></div><p class="hint">You can reopen a ticket for 7 days after it is closed.</p>';
+  }
   h += '<div class="sec-h">Timeline</div><ul class="timeline">'+t.events.map(function(e){
-    var label = {created:'Ticket raised', assigned:'Assigned', reassigned:'Reassigned', remark:'HR remark', closed:'Ticket closed'}[e.type]||e.type;
+    var label = {created:'Ticket raised', assigned:'Assigned', reassigned:'Reassigned', remark:'HR remark', closed:'Ticket closed', reply:(e.by===myCode()?'Your reply':'Employee reply'), reopened:'Ticket reopened'}[e.type]||e.type;
     var by = e.by==='system' ? 'System' : nameOf(e.by);
     var text = e.type==='created' ? '' : e.text;
     return '<li class="'+(e.type==='closed'?'closed':(e.type==='assigned'||e.type==='reassigned')?'assign':'')+'"><div class="when">'+fmt(e.at)+' · '+esc(by)+'</div><div class="what">'+label+'</div>'+(text?'<div class="txt">'+esc(text)+'</div>':'')+'</li>';
@@ -1314,6 +1648,7 @@ function closeModal(){
 function fixLabels(root){
   root=root||document;
   [].forEach.call(root.querySelectorAll('label:not([for])'),function(l){
+    if(l.querySelector('input,select,textarea')) return;                       // a label that wraps its control is already associated
     var c = l.closest('.f,.lfield,.field') || l.parentNode, ctl = c && c.querySelector('input:not([type=hidden]),select,textarea');
     if(!ctl) return; if(!ctl.id) ctl.id='ctl'+(++labSeq); l.setAttribute('for',ctl.id);
   });
@@ -1545,6 +1880,8 @@ function bindView(){
   if($('openSlipPdf')) $('openSlipPdf').onclick = function(){ openPdf('payslip', ui.slipMonth, 'Payslip'); };
   if(ui.view==='pinreset') bindPinReset();
   if(ui.view==='viewas') bindViewAs();
+  if(ui.view==='offergen') bindOfferGen();
+  if(ui.view==='ats') bindAts();
   if(ui.view==='ijp') bindIjp();
   $('profileBtn').classList.toggle('active', ui.view==='profile');
   $('navHome').classList.toggle('active', ui.view==='home');
@@ -1605,6 +1942,11 @@ function bindTicket(){
              : '<p>Preview isn\u2019t available for this file type in the prototype. Once files are stored in Google Drive, this will open the file there.</p>';
     modal('<h4>'+esc(f.name)+'</h4><p>'+kb(f.size)+'</p>'+body+'<div class="row" style="margin-top:12px"><button class="btn sec" id="mCancel">Close</button></div>', function(){ $('mCancel').onclick=closeModal; });
   }; });
+  if(t && $('sendReply')) $('sendReply').onclick=function(){
+    var txt=$('replyTxt').value.trim(); if(txt.length<2) return toast('Write a reply first');
+    addEvent(t,'reply',txt); save(); toast('Reply sent to HR'); render();
+  };
+  if(t && $('reopenT')) $('reopenT').onclick=function(){ t.status='Open'; delete t.closedAt; save(); toast('Ticket reopened'); render(); };
   if(!t || !$('addRemark')) return;
   $('addRemark').onclick=function(){
     if(readOnly()) return;
