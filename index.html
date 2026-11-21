@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-tWqQ5M30wLIVnoI2z/q2h+OkV47AERYNqqTk/lweyuc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Rk376ybol+Xn8919iKvsZEnADTvHj+Rvy8Jy6tDjh0I='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -721,6 +721,9 @@ function offerMatches(o, emp){
 
 // NAPS demo apprentice (Employee Code uses the same NAPS### pattern as the real register)
 /* demo row removed */
+var DEMO_NAPS_PAYROLL = []
+var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function slipKey(x){ return x['Pay Year']+'-'+('0'+(MONTHS.indexOf(String(x['Pay Month']).trim())+1)).slice(-2); }
 
 // ---- data layer: same interface for demo and live ----
 var Docs = {
