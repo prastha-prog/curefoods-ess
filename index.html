@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-b46XZ+iv1AxrS0BETJvhxIPEfTANilmiiBAMBAhnajc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0fb9gALQdM/FN5sD3sgGB09ZTubGeTHIc3C3CvBNZDc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -1373,6 +1373,7 @@ var PEOPLE = {}, HR_LIST = [], SNAP = {}, lastSync = 0, ATS_ACCESS = null;
 function empByCode(c){ return EMPLOYEE_MASTER.filter(function(r){return r['Employee Code']===c;})[0] || (LIVE ? PEOPLE[c] : null) || null; }
 function nameOf(c){ var e=empByCode(c); return e?e['Employee Name']:c; }
 function isHR(e){ return e && HR_ROLES.indexOf(e['Role'])!==-1; }
+function canOffer(e){ return isHR(e) || !!(e && e.OfferAccess); }       // HR Managers, plus anyone the admin has named on an offer list (the server decides on every call)
 // Payslips are for NAPS apprentices only: their Employee Code starts with NAPS (same pattern as the NAPS register).
 function isNaps(e){ return !!e && /^NAPS/i.test(String(e['Employee Code']||'')); }
 function hrList(){ if(LIVE) return HR_LIST; return EMPLOYEE_MASTER.filter(function(e){ return isHR(e) && e['Employment Status']==='Active'; }); }
@@ -1466,7 +1467,7 @@ function signOut(){
 }
 function go(view, opts){
   if((view==='payslips'||view==='slip') && !isNaps(me)) view='home';
-  if(view==='offergen' && !(isHR(me) && !impState())) view='home';
+  if(view==='offergen' && !(canOffer(me) && !impState())) view='home';
   if(view==='ats' && !atsOK()) view='home';
   if(view==='ats' && ui.view!=='ats') ui.at=null;       // HR Managers only, never inside an admin access session   // payslips: NAPS employees only
   ui.view=view; opts=opts||{};
@@ -1506,7 +1507,7 @@ function homeHTML(){
       '<button class="mcard" data-go="offer"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">My Offer Letter</div><div class="s">View your offer letter</div></div></button>'+
       '<button class="mcard" data-go="ijp"><div class="ic">'+ICON_JOB+'</div><div><div class="t">Internal Job Posting</div><div class="s">Open roles for returning employees</div></div></button>'+
       (atsOK() ? '<button class="mcard" data-go="ats"><div class="ic">'+ICON_ATS+'</div><div><div class="t">Recruitment</div><div class="s">Jobs, candidates, interviews</div></div></button>' : '')+
-      (isHR(me) && !impState() ? '<button class="mcard" data-go="offergen"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Offer Letter</div><div class="s">Create and email an offer letter</div></div></button>' : '')+
+      (canOffer(me) && !impState() ? '<button class="mcard" data-go="offergen"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Offer Letter</div><div class="s">Create and email an offer letter</div></div></button>' : '')+
       (isNaps(me) ? '<button class="mcard" data-go="payslips"><div class="ic">'+ICON_SLIP+'</div><div><div class="t">Payslips</div><div class="s">Monthly payslips & stipend slips</div></div></button>' : '')+
 
     '</div>';
