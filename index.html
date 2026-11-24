@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B+tCZGvcN/D57X5uarHYtyPQcelY1TXscgIr6P5GZCU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-J0roTBW4zw4NiChbvsnxmF/y4N4eQTkeAAmyYZRJCuc='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -1488,7 +1488,7 @@ function go(view, opts){
   if(opts.tab) ui.tab=opts.tab;
   if(opts.ticketId) ui.ticketId=opts.ticketId;
   render(); window.scrollTo(0,0);
-  if(LIVE && me && ['home','helpdesk','ticket','ijp'].indexOf(view)!==-1 && Date.now()-lastSync>20000) boot().then(render).catch(function(){});
+  if(LIVE && me && ['home','helpdesk','ticket','ijp','actions'].indexOf(view)!==-1 && Date.now()-lastSync>20000) boot().then(render).catch(function(){});
 }
 
 function render(){
@@ -1506,6 +1506,7 @@ function render(){
   else if(ui.view==='payslips') v.innerHTML = payslipListHTML();
   else if(ui.view==='slip') v.innerHTML = payslipViewHTML();
   else if(ui.view==='ijp') v.innerHTML = ijpHTML();
+  else if(ui.view==='actions') v.innerHTML = actionsHTML();
   else if(ui.view==='referral') v.innerHTML = referralHTML();
   bindView();
 }
@@ -1570,6 +1571,55 @@ function bindReferral(){
     }).catch(function(){ err('rfErr','Network problem. Please try again.'); }).then(function(){ busy(b,false,'Submit referral'); });
   };
   refLoad();
+}
+
+/* ===================== ACTIONS: notifications, approvals, updates ===================== */
+function actItems(){
+  var me_=myCode(), items=[], rf=ui.ref||{mine:[],toApprove:[]};
+  rf.toApprove.filter(function(x){ return x.status==='Pending'; }).forEach(function(x){
+    items.push({kind:'approval', at:x.at, title:'Referral approval: '+x.name, sub:x.designation+' · '+x.brand+' · '+x.location+' · referred by '+x.by, pill:'Needs your approval', pc:'open', ref:x}); });
+  TICKETS.forEach(function(t){
+    var evs=t.events.filter(function(e){ return e.type!=='created'; }), last=evs[evs.length-1], closed=t.status==='Closed', mineT=t.raisedBy===me_;
+    if(!closed && t.assignedTo===me_ && !mineT) items.push({kind:'approval', at:(last&&last.by===t.raisedBy)?last.at:t.createdAt, title:'Ticket '+t.id+' needs your response', sub:t.category+' · raised by '+nameOf(t.raisedBy), pill:(last&&last.type==='reply'&&last.by===t.raisedBy)?'Employee replied':'Open', pc:'open', ticket:t.id});
+    if(mineT){
+      var other=evs.filter(function(e){ return e.by!==me_; }); other=other[other.length-1];
+      if(closed) items.push({kind:'update', at:t.closedAt||(last&&last.at)||t.createdAt, title:'Ticket '+t.id+' was closed', sub:t.category, pill:'Closed', pc:'closed', ticket:t.id});
+      else if(other) items.push({kind:'update', at:other.at, title:'Ticket '+t.id+': '+({assigned:'assigned to HR',reply:'new reply',reopened:'reopened'}[other.type]||'updated'), sub:t.category, pill:t.status, pc:'progress', ticket:t.id});
+      else items.push({kind:'notice', at:t.createdAt, title:'Ticket '+t.id+' is open', sub:t.category+' · waiting for HR', pill:'Open', pc:'open', ticket:t.id});
+    }
+  });
+  rf.mine.forEach(function(x){
+    if(x.status==='Pending') items.push({kind:'notice', at:x.at, title:'Referral '+x.name+' is awaiting approval', sub:x.designation+' · '+x.brand+' · '+x.location, pill:'Pending', pc:'open'});
+    else items.push({kind:'update', at:x.decidedAt||x.at, title:'Referral '+x.name+' was '+x.status.toLowerCase(), sub:x.designation+' · '+x.brand+' · '+x.location, pill:x.status, pc:x.status==='Approved'?'closed':'over'});
+  });
+  return items.sort(function(a,b){ return b.at-a.at; });
+}
+function actionsHTML(){
+  return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Actions</h2></div>'+
+    '<div class="tabs" id="actTabs"></div><div id="actList"><div class="empty">Loading…</div></div>'+
+    '<div style="margin-top:14px"><button class="btn sec" data-go="helpdesk" type="button">Open helpdesk</button></div>';
+}
+function actPaint(){
+  var all=actItems(), tab=ui.actTab||'all', cnt={all:all.length, approval:0, update:0};
+  all.forEach(function(i){ if(cnt[i.kind]!=null) cnt[i.kind]++; });
+  $('actTabs').innerHTML=[['all','Notifications'],['approval','Approvals'],['update','Updates']].map(function(t){
+    return '<button class="tab'+(t[0]===tab?' active':'')+'" data-act-tab="'+t[0]+'">'+t[1]+'<span class="n">'+cnt[t[0]]+'</span></button>'; }).join('');
+  var list=tab==='all'?all:all.filter(function(i){ return i.kind===tab; });
+  $('actList').innerHTML = list.length ? '<div class="ijp-apps">'+list.map(function(i){
+    return '<div class="trow"'+(i.ticket?' data-ticket="'+esc(i.ticket)+'"':' style="cursor:default"')+'><div><div class="id">'+esc(i.title)+'</div><div class="cat">'+esc(i.sub)+'</div></div><span class="pill '+i.pc+'">'+esc(i.pill)+'</span>'+
+      '<div class="meta">'+fmt(i.at)+'</div>'+
+      (i.ref ? '<div style="grid-column:1/-1;display:flex;gap:8px;margin-top:8px"><button class="btn" data-rf-do="approve" data-rf-id="'+esc(i.ref.id)+'">Approve</button><button class="btn sec" data-rf-do="reject" data-rf-id="'+esc(i.ref.id)+'">Reject</button></div>' : '')+'</div>'; }).join('')+'</div>'
+    : '<div class="empty">'+(tab==='approval'?'Nothing is waiting for your approval.':tab==='update'?'No updates yet.':'You are all caught up.')+'</div>';
+  [].forEach.call($('actTabs').querySelectorAll('[data-act-tab]'),function(b){ b.onclick=function(){ ui.actTab=b.dataset.actTab; actPaint(); }; });
+  [].forEach.call($('actList').querySelectorAll('[data-ticket]'),function(b){ b.onclick=function(){ go('ticket',{ticketId:b.dataset.ticket}); }; });
+  [].forEach.call($('actList').querySelectorAll('[data-rf-do]'),function(b){ b.onclick=function(){
+    [].forEach.call($('actList').querySelectorAll('[data-rf-do]'),function(x){ x.disabled=true; });
+    api({action:'decideReferral', session:session(), id:b.dataset.rfId, decision:b.dataset.rfDo}).then(function(r){ toast(r.ok ? 'Referral '+r.referral.status.toLowerCase() : (r.error||'Could not save your decision')); actLoad(); }).catch(function(){ toast('Network problem. Please try again.'); actLoad(); });
+  }; });
+}
+function actLoad(){
+  if(!LIVE || impState()){ ui.ref=null; return actPaint(); }
+  api({action:'referrals', session:session()}).then(function(r){ if(ui.view!=='actions') return; if(r.ok) ui.ref=r; actPaint(); }).catch(function(){ if(ui.view==='actions') actPaint(); });
 }
 
 function homeHTML(){
@@ -1951,10 +2001,11 @@ function bindView(){
   if(ui.view==='offergen') bindOfferGen();
   if(ui.view==='ats') bindAts();
   if(ui.view==='ijp') bindIjp();
+  if(ui.view==='actions'){ actPaint(); actLoad(); }
   if(ui.view==='referral') bindReferral();
   $('profileBtn').classList.toggle('active', ui.view==='profile');
   $('navHome').classList.toggle('active', ui.view==='home');
-  $('navTickets').classList.toggle('active', ui.view==='helpdesk'||ui.view==='ticket');
+  $('navTickets').classList.toggle('active', ui.view==='helpdesk'||ui.view==='ticket'||ui.view==='actions');
   if(ui.view==='helpdesk' && ui.tab==='raise') bindRaise();
   if(ui.view==='ticket') bindTicket();
 }
@@ -2058,7 +2109,7 @@ function bindTicket(){
 
 $('profileBtn').onclick = function(){ go('profile'); };
 $('navHome').onclick = function(){ go('home'); };
-$('navTickets').onclick = function(){ go('helpdesk'); };
+$('navTickets').onclick = function(){ go('actions'); };
 (function(){
   try{
     if(LIVE){ var tok=session(); if(tok) api({action:'me', session:tok}).then(function(r){ if(r.ok) enter(r.employee); else sessionStorage.removeItem('cf_session'); }).catch(function(){}); return; }
