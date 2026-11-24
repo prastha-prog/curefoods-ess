@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hphHZtxAGr34GMb3G6gjJ5OkhapUYht6mmjfsKw+vzs='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-B+tCZGvcN/D57X5uarHYtyPQcelY1TXscgIr6P5GZCU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -229,6 +229,9 @@ button{font-family:inherit}
 .bn-who span{font-family:var(--mono); font-size:9px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap}
 .impbar{top:50px !important}
 /* ---- Internal Job Posting ---- */
+.ijp-filters{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.ijp-filters select{width:100%}
+@media(max-width:520px){.ijp-filters{grid-template-columns:1fr}}
 .ijp-h{margin:20px 0 10px; font-family:var(--serif); font-size:19px; font-weight:500; scroll-margin-top:70px}
 .ijp-tiles{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
 .ijp-tile{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px; cursor:pointer; transition:border-color .12s, transform .12s}
@@ -350,13 +353,13 @@ button{font-family:inherit}
     <p class="lhint" id="modeHint" style="margin-top:14px"></p>
 
     <div class="login-alt">
+      <button class="alt-btn" id="jobsBtn">
+        <div class="alt-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.2" y="7.2" width="17.6" height="12.2" rx="2"/><path d="M8.5 7.2V5.6a1.8 1.8 0 0 1 1.8-1.8h3.4a1.8 1.8 0 0 1 1.8 1.8v1.6"/><path d="M3.2 12.5h17.6"/><path d="M10.4 12.5v1.7h3.2v-1.7"/></svg></div>
+        <div><div class="alt-title">Apply for Jobs at Curefoods</div><div class="alt-sub">Browse open roles and submit your application</div></div>
+      </button>
       <button class="alt-btn" id="preHireBtn">
         <div class="alt-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M8 8l4-4 4 4"/><path d="M4.5 15v3.2c0 1 .8 1.8 1.8 1.8h11.4c1 0 1.8-.8 1.8-1.8V15"/></svg></div>
         <div><div class="alt-title">New to Curefoods?</div><div class="alt-sub">Register yourself to get enrolled</div></div>
-      </button>
-      <button class="alt-btn" id="alumniBtn">
-        <div class="alt-ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.5 9l9.5 5 9.5-5z"/><path d="M6.5 11.5V16c0 1.5 3 3 5.5 3s5.5-1.5 5.5-3v-4.5"/></svg></div>
-        <div><div class="alt-title">Alumni Portal</div><div class="alt-sub">Marked as exited in the Employee Master</div></div>
       </button>
     </div>
     <p class="login-foot">Trouble signing in? Contact your HR Business Partner.</p>
@@ -390,6 +393,8 @@ var EMPLOYEE_MASTER = [];
 // API_URL filled -> Apps Script backend (Code.gs) holds PINs (hashed) and the real Employee Master.
 var CONFIG = { API_URL: 'https://script.google.com/macros/s/AKfycbxG7sgO3u4CIdhKUupFH0FQz-VnL_GU3A29FNsbY7S4W4y8y26xvRbiFWvTGagRb9jb/exec' };
 var LIVE = !!CONFIG.API_URL;
+/* wake the Apps Script backend while the person is still typing their ID, so the first real call is not a cold start */
+if(LIVE){ try{ fetch(CONFIG.API_URL,{mode:'no-cors'}).catch(function(){}); }catch(e){} }
 var MAX_FAILS = 5, LOCK_MIN = 30;
 
 function $(id){ return document.getElementById(id); }
@@ -549,8 +554,7 @@ function boot(){
 function enter(emp){
   if(LIVE){
     var local=lookup(emp['Employee Code']); if(local){ for(var k in emp) local[k]=emp[k]; emp=local; } else EMPLOYEE_MASTER.push(emp);
-    boot().then(function(){ startApp(emp); }).catch(function(){ toast('Could not load your data. Please try again.'); });
-    return;
+    return boot().then(function(){ startApp(emp); }).catch(function(){ toast('Could not load your data. Please try again.'); });
   }
   startApp(emp);
 }
@@ -639,13 +643,26 @@ function openCareers(q){
     [].forEach.call(document.querySelectorAll('[data-apply]'), function(b){ b.onclick = function(){ openApply(b.dataset.apply); }; });
   });
 }
+function resumeLink(c){
+  return /^file:/.test(c.resume) ? '<button class="btn sec" data-cv="'+esc(c.id)+'" type="button">Open resume</button>' : '<a href="'+esc(c.resume)+'" target="_blank" rel="noopener noreferrer">Open resume</a>';
+}
+document.addEventListener('click', function(e){
+  var b = e.target.closest && e.target.closest('[data-cv]'); if(!b || !LIVE) return;
+  b.disabled = true;
+  api({action:'atsResume', session:session(), id:b.dataset.cv}).then(function(r){
+    b.disabled = false; if(!r.ok) return toast(r.error||'Could not open the resume.');
+    var bin=atob(r.base64), arr=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([arr])); a.download=r.name||('Resume.'+r.ext); document.body.appendChild(a); a.click(); a.remove();
+  }).catch(function(){ b.disabled=false; toast('Could not reach the server.'); });
+});
 function openApply(id){
   var j = ATS_JOBS.filter(function(x){ return x.id===id; })[0]; if(!j) return;
   modal('<h4>Apply for this role</h4><p>'+esc(j.title)+' · '+esc(j.dept)+' · '+esc(j.loc)+'</p>'+
     '<div class="f"><label>Full name</label><input id="aName" autocomplete="name"></div>'+
     '<div class="f"><label>Email</label><input id="aEmail" type="email" autocomplete="email"></div>'+
     '<div class="f"><label>Mobile</label><input id="aPhone" type="tel" autocomplete="tel" inputmode="numeric"></div>'+
-    '<div class="f"><label>Link to your resume (Drive or LinkedIn)</label><input id="aCv" type="url" placeholder="https://"></div>'+
+    '<div class="f"><label for="aFile">Upload your resume (PDF or Word, up to 2 MB)</label><input id="aFile" type="file" accept=".pdf,.doc,.docx"></div>'+
+    '<div class="f"><label for="aCv">Or paste a link to your resume</label><input id="aCv" type="url" placeholder="https://"></div>'+
     '<p class="hint" style="margin:0 0 10px">We use these details only to process this application.</p>'+
     '<div class="row"><button class="btn sec" id="aBack" type="button">Back</button><button class="btn" id="aSubmit" type="button">Submit application</button></div>', function(){
     $('aBack').onclick = function(){ openCareers(); };
@@ -653,19 +670,19 @@ function openApply(id){
       var a = {action:'apply', job:j.id, name:$('aName').value.trim(), email:$('aEmail').value.trim(), phone:$('aPhone').value.trim(), resume:$('aCv').value.trim(), src:'careers', stage:'Applied', at:new Date().toISOString()};
       if(!a.name || !/^\S+@\S+\.\S+$/.test(a.email) || a.phone.replace(/\D/g,'').length<10){ toast('Please enter your name, a valid email and a 10-digit mobile number.'); return; }
       function done(){ closeModal(); toast('Application submitted for '+j.title+'. We will be in touch.'); }
-      if(LIVE){ api({action:'atsApply', job:a.job, name:a.name, email:a.email, phone:a.phone, resume:a.resume}).then(function(r){ if(r.ok) done(); else toast(r.error||'Could not submit right now.'); }).catch(function(){ toast('Could not submit right now. Please try again.'); }); return; }
+      if(LIVE){
+        var fl=$('aFile').files[0], sb=$('aSubmit');
+        var send=function(file){ sb.disabled=true; api({action:'atsApply', job:a.job, name:a.name, email:a.email, phone:a.phone, resume:a.resume, file:file}).then(function(r){ if(r.ok) done(); else { sb.disabled=false; toast(r.error||'Could not submit right now.'); } }).catch(function(){ sb.disabled=false; toast('Could not submit right now. Please try again.'); }); };
+        if(!fl) return send(null);
+        if(!/\.(pdf|docx?)$/i.test(fl.name)) return toast('Please upload a PDF or Word file.');
+        if(fl.size>2*1024*1024) return toast('That file is too large. Please upload a resume under 2 MB.');
+        var fr=new FileReader(); fr.onload=function(){ send({name:fl.name, data:String(fr.result).split(',')[1]||''}); }; fr.onerror=function(){ toast('Could not read that file.'); }; fr.readAsDataURL(fl); return; }
       toast('Applications are not open right now. Please try again later.'); return;
     };
   });
 }
-/* Apply for jobs now lives on the Careers page */
+$('jobsBtn').onclick = function(){ openCareers(); };
 var PAYSLIP_PUBLIC_URL = 'https://script.google.com/macros/s/AKfycbxRwpkJt1JzuqdA0kaFjhI9KLZVvXVe3fkkNtVJp9zPPxYkj_PvgLZSPEg4VX25ugwGsw/exec';
-$('alumniBtn').onclick = function(){
-  modal('<h4>Alumni</h4><p>The Alumni Portal is on its way. If you were a NAPS apprentice, you can still download your stipend slips with your Employee ID and date of birth.</p>'+
-    '<div class="row"><button class="btn sec" id="mCancel" type="button">Close</button><button class="btn" id="mOk" type="button">Download my stipend slip</button></div>', function(){
-    $('mCancel').onclick=closeModal; $('mOk').onclick=function(){ window.open(PAYSLIP_PUBLIC_URL,'_blank','noopener'); closeModal(); };
-  });
-};
 
 // ===================== EMPLOYEE MASTER — extra profile columns (sample) =====================
 // Same column names as the real Employee Master export, so swapping in the real sheet needs no mapping.
@@ -960,7 +977,7 @@ function ogEnt(){ var og=ogS(); return og.cfg && og.cfg.entities.filter(function
 function ogF(id,label,ctl,span){ return '<div class="f"'+(span?' style="grid-column:1/-1"':'')+'><label for="'+id+'">'+label+'</label>'+ctl+'</div>'; }
 function ogIn(id,type,val,ph,extra){ return '<input id="'+id+'" type="'+type+'" value="'+esc(val||'')+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+(extra||'')+'>'; }
 function offerGenHTML(){
-  var og=ogS(), h='<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Generate Offer Letter</h2></div>';
+  var og=ogS(), h='<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Generate Letters</h2></div>';
   if(!LIVE) return h+'<div class="panel"><div class="note">Offer generation works once the portal is connected to its backend.</div></div>';
   if(!og.cfg) return h+'<div class="panel"><p class="hint">Loading your offer letter access…</p></div>';
   if(og.cfg.error) return h+'<div class="panel"><div class="note">'+esc(og.cfg.error)+'</div></div>';
@@ -1193,7 +1210,7 @@ function atsCandModal(id){
     var c=r.candidate, d=atS().data, acc=d.access, P=r.candidate.people||{}; function nm(code){ return code==='system'?'System':(P[code]?P[code]['Employee Name']:atN(code)); }
     var h='<h4>'+esc(c.name)+' '+atsPill(c.stage)+'</h4><p class="hint" style="margin:0 0 8px">'+esc(c.id)+' · '+esc(c.jobTitle)+' · '+esc(c.source||'')+' · applied '+fmtDay(c.appliedAt)+'</p>';
     if(c.full){ h+='<div class="note" style="margin-bottom:8px">'+esc(c.email)+' · '+esc(c.phone)+'</div>'; }
-    if(c.resume) h+='<p style="margin:0 0 8px"><a href="'+esc(c.resume)+'" target="_blank" rel="noopener noreferrer">Open resume</a></p>';
+    if(c.resume) h+='<p style="margin:0 0 8px">'+resumeLink(c)+'</p>';
     if(c.full){
       var st=d.stages.map(function(x){ var dis=!acc.recruiter && (x==='Offer'||x==='Hired'); return '<option'+(x===c.stage?' selected':'')+(dis?' disabled':'')+'>'+x+'</option>'; }).join('');
       h+='<div class="f"><label for="cdStage">Stage</label><div style="display:flex;gap:8px"><select id="cdStage">'+st+'</select><button class="btn" id="cdMove" type="button">Move</button><button class="btn sec" id="cdReject" type="button">Reject…</button></div></div>';
@@ -1240,7 +1257,7 @@ function atsIvModal(id){
     var P=c.people||{}; function nm(code){ return P[code]?P[code]['Employee Name']:atN(code); }
     var mineAllowed = i.interviewers.indexOf(me['Employee Code'])!==-1 && i.status!=='Cancelled';
     var h='<h4>'+esc(i.round)+' '+atsPill(i.status)+'</h4><p class="hint" style="margin:0 0 8px">'+esc(c.name)+' · '+esc(c.jobTitle)+'</p><div class="note" style="margin-bottom:8px">'+esc(i.when.replace('T',' '))+' IST · '+esc(i.mode)+'<br>Interviewers: '+esc(i.interviewers.map(nm).join(', '))+(i.link?'<br><a href="'+esc(i.link)+'" target="_blank" rel="noopener noreferrer">Join the meeting</a>':'')+'</div>';
-    if(c.resume) h+='<p style="margin:0 0 8px"><a href="'+esc(c.resume)+'" target="_blank" rel="noopener noreferrer">Open resume</a></p>';
+    if(c.resume) h+='<p style="margin:0 0 8px">'+resumeLink(c)+'</p>';
     if(i.feedback&&i.feedback.length) h+='<div class="sec-h">Feedback</div>'+i.feedback.map(function(f){ return '<div class="note" style="margin-bottom:6px"><b>'+esc(nm(f.by))+'</b>: '+esc(f.rec)+'<br>'+Object.keys(f.scores).map(function(k){ return esc(k)+' '+f.scores[k]+'/5'; }).join(' · ')+(f.comment?'<br>'+esc(f.comment):'')+'</div>'; }).join('');
     if(mineAllowed){
       var sc=AT_CRIT.map(function(k,x){ return '<div class="f" style="margin:4px 0"><label for="fb'+x+'">'+k+'</label><select id="fb'+x+'" data-crit="'+esc(k)+'"><option value="">–</option>'+[1,2,3,4,5].map(function(n){ return '<option'+(i.mine&&i.mine.scores[k]===n?' selected':'')+'>'+n+'</option>'; }).join('')+'</select></div>'; }).join('');
@@ -1465,6 +1482,7 @@ function go(view, opts){
   if((view==='payslips'||view==='slip') && !isNaps(me)) view='home';
   if(view==='offergen' && !(canOffer(me) && !impState())) view='home';
   if(view==='ats' && !atsOK()) view='home';
+  if(view==='referral' && (!LIVE || impState())) view='home';
   if(view==='ats' && ui.view!=='ats') ui.at=null;       // HR Managers only, never inside an admin access session   // payslips: NAPS employees only
   ui.view=view; opts=opts||{};
   if(opts.tab) ui.tab=opts.tab;
@@ -1488,7 +1506,70 @@ function render(){
   else if(ui.view==='payslips') v.innerHTML = payslipListHTML();
   else if(ui.view==='slip') v.innerHTML = payslipViewHTML();
   else if(ui.view==='ijp') v.innerHTML = ijpHTML();
+  else if(ui.view==='referral') v.innerHTML = referralHTML();
   bindView();
+}
+
+/* ===================== REFER A CANDIDATE ===================== */
+var ICON_REF = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.4-3 2.7-4.8 5.5-4.8s5.1 1.8 5.5 4.8"/><path d="M17.5 8v5M15 10.5h5"/></svg>';
+var REF_BRANDS = ['Curefoods India','Cakezone Foodtech','Rolls on Wheels','Other'];
+function refPill(st){ return '<span class="pill '+(st==='Approved'?'closed':st==='Rejected'?'over':'open')+'">'+(st==='Pending'?'Awaiting approval':esc(st))+'</span>'; }
+function refDay(t){ return t ? new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : ''; }
+function referralHTML(){
+  return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Refer a Candidate</h2></div>'+
+    '<div class="panel"><div class="note">Your HR partner and L1 manager are emailed to approve your referral. Either of them can approve it.</div>'+
+    '<div class="f"><label for="rfName">Candidate name</label><input id="rfName" maxlength="80" autocomplete="off"></div>'+
+    '<div class="f"><label for="rfPhone">Candidate mobile number</label><input id="rfPhone" type="tel" inputmode="numeric" maxlength="15" autocomplete="off" placeholder="10-digit mobile number"></div>'+
+    '<div class="f"><label for="rfLoc">Location</label><input id="rfLoc" maxlength="80" autocomplete="off" placeholder="City or kitchen"></div>'+
+    '<div class="f"><label for="rfBrand">Brand</label><select id="rfBrand"><option value="">Select a brand</option>'+REF_BRANDS.map(function(b){ return '<option>'+esc(b)+'</option>'; }).join('')+'</select></div>'+
+    '<div class="f"><label for="rfDes">Designation</label><input id="rfDes" maxlength="80" autocomplete="off" placeholder="Role the candidate is suited for"></div>'+
+    '<p class="lerror" id="rfErr"></p><button class="btn" id="rfSubmit">Submit referral</button></div>'+
+    '<div id="refLists"><div class="empty">Loading…</div></div>';
+}
+function refListsHTML(){
+  var d = ui.ref || {mine:[],toApprove:[]}, h = '';
+  var pend = d.toApprove.filter(function(x){ return x.status==='Pending'; });
+  if(d.toApprove.length) h += '<h3 style="margin:22px 0 8px;font-size:14px">Awaiting your approval'+(pend.length?' ('+pend.length+')':'')+'</h3><div class="ijp-apps">'+d.toApprove.map(function(x){
+    return '<div class="trow" style="cursor:default"><div><div class="id">'+esc(x.name)+'</div><div class="cat">'+esc(x.designation)+' · '+esc(x.brand)+' · '+esc(x.location)+'</div></div>'+refPill(x.status)+
+      '<div class="meta">Referred by '+esc(x.by)+' · '+esc(x.phone)+' · '+refDay(x.at)+'</div>'+
+      (x.status==='Pending' ? '<div style="grid-column:1/-1;display:flex;gap:8px;margin-top:8px"><button class="btn" data-rf-do="approve" data-rf-id="'+esc(x.id)+'">Approve</button><button class="btn sec" data-rf-do="reject" data-rf-id="'+esc(x.id)+'">Reject</button></div>' : '')+'</div>'; }).join('')+'</div>';
+  h += '<h3 style="margin:22px 0 8px;font-size:14px">My referrals</h3>'+(d.mine.length ? '<div class="ijp-apps">'+d.mine.slice().sort(function(a,b){ return b.at-a.at; }).map(function(x){
+    return '<div class="trow" style="cursor:default"><div><div class="id">'+esc(x.name)+'</div><div class="cat">'+esc(x.designation)+' · '+esc(x.brand)+' · '+esc(x.location)+'</div></div>'+refPill(x.status)+
+      '<div class="meta">'+esc(x.id)+' · submitted '+refDay(x.at)+(x.decidedAt?' · '+esc(x.status.toLowerCase())+' '+refDay(x.decidedAt):'')+'</div></div>'; }).join('')+'</div>'
+    : '<div class="empty">You have not referred anyone yet.</div>');
+  return h;
+}
+function refLoad(){
+  if(!LIVE){ if($('refLists')) $('refLists').innerHTML='<div class="empty">Referrals are available when the portal is connected.</div>'; return; }
+  api({action:'referrals', session:session()}).then(function(r){
+    if(!r.ok || ui.view!=='referral') return; ui.ref=r; $('refLists').innerHTML=refListsHTML(); bindRefLists();
+  }).catch(function(){ if($('refLists')) $('refLists').innerHTML='<div class="empty">Could not load your referrals. Please try again.</div>'; });
+}
+function bindRefLists(){
+  [].forEach.call($('refLists').querySelectorAll('[data-rf-do]'),function(b){ b.onclick=function(){
+    var all=$('refLists').querySelectorAll('[data-rf-do]'); [].forEach.call(all,function(x){ x.disabled=true; });
+    api({action:'decideReferral', session:session(), id:b.dataset.rfId, decision:b.dataset.rfDo}).then(function(r){
+      toast(r.ok ? 'Referral '+r.referral.status.toLowerCase() : (r.error||'Could not save your decision')); refLoad();
+    }).catch(function(){ toast('Network problem. Please try again.'); refLoad(); });
+  }; });
+}
+function bindReferral(){
+  $('rfSubmit').onclick=function(){
+    err('rfErr'); var b=$('rfSubmit');
+    var v={name:$('rfName').value.trim(), phone:$('rfPhone').value.trim(), location:$('rfLoc').value.trim(), brand:$('rfBrand').value, designation:$('rfDes').value.trim()};
+    if(v.name.length<2) return err('rfErr','Enter the candidate’s name.');
+    if(!/^(\+?91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}$/.test(v.phone)) return err('rfErr','Enter a valid 10-digit mobile number.');
+    if(v.location.length<2) return err('rfErr','Enter the location.');
+    if(!v.brand) return err('rfErr','Select a brand.');
+    if(v.designation.length<2) return err('rfErr','Enter the designation.');
+    busy(b,true,'Submitting…');
+    api({action:'submitReferral', session:session(), referral:v}).then(function(r){
+      if(!r.ok) return err('rfErr', r.error||'Could not submit the referral.');
+      ['rfName','rfPhone','rfLoc','rfDes'].forEach(function(i){ $(i).value=''; }); $('rfBrand').value='';
+      toast('Referral submitted. Your HR partner and L1 manager have been emailed.'); refLoad();
+    }).catch(function(){ err('rfErr','Network problem. Please try again.'); }).then(function(){ busy(b,false,'Submit referral'); });
+  };
+  refLoad();
 }
 
 function homeHTML(){
@@ -1502,8 +1583,9 @@ function homeHTML(){
       (isHR(me) && !impState()?'<button class="mcard" data-go="pinreset"><div class="ic">'+ICON_KEY+'</div><div><div class="t">PIN Reset</div><div class="s">Reset an employee\u2019s sign-in PIN</div></div></button>':'')+
       '<button class="mcard" data-go="offer"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">My Offer Letter</div><div class="s">View your offer letter</div></div></button>'+
       '<button class="mcard" data-go="ijp"><div class="ic">'+ICON_JOB+'</div><div><div class="t">Internal Job Posting</div><div class="s">Open roles for returning employees</div></div></button>'+
+      (LIVE && !impState() ? '<button class="mcard" data-go="referral"><div class="ic">'+ICON_REF+'</div><div><div class="t">Refer a Candidate</div><div class="s">Refer someone for a role at Curefoods</div></div></button>' : '')+
       (atsOK() ? '<button class="mcard" data-go="ats"><div class="ic">'+ICON_ATS+'</div><div><div class="t">Recruitment</div><div class="s">Jobs, candidates, interviews</div></div></button>' : '')+
-      (canOffer(me) && !impState() ? '<button class="mcard" data-go="offergen"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Offer Letter</div><div class="s">Create and email an offer letter</div></div></button>' : '')+
+      (canOffer(me) && !impState() ? '<button class="mcard" data-go="offergen"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Letters</div><div class="s">Create and email letters</div></div></button>' : '')+
       (isNaps(me) ? '<button class="mcard" data-go="payslips"><div class="ic">'+ICON_SLIP+'</div><div><div class="t">Payslips</div><div class="s">Monthly payslips & stipend slips</div></div></button>' : '')+
 
     '</div>';
@@ -1681,7 +1763,7 @@ function ijpRows(){
   if(!IJP_ROWS) IJP_ROWS = LIVE ? [] : IJP_OPENINGS.map(function(r){ return {code:r[0], name:r[1], state:r[2], brand:r[3], open:r[4]}; });
   return IJP_ROWS;
 }
-function ijpS(){ if(!ui.ijp) ui.ijp = {brand:'', state:null, q:'', limit:IJP_PAGE}; return ui.ijp; }
+function ijpS(){ if(!ui.ijp) ui.ijp = {brand:'', state:'', q:'', limit:IJP_PAGE}; return ui.ijp; }
 function ijpNum(n){ return Number(n).toLocaleString('en-IN'); }
 
 // ---- applications store (demo: this browser) ----
@@ -1740,37 +1822,27 @@ function ijpPlate(brand, small){
 }
 
 function ijpOpeningsHTML(){
-  var s = ijpS(), rows = ijpRows();
-  if(!s.brand){
-    var g = {};
-    rows.forEach(function(r){ g[r.brand] = (g[r.brand]||0) + r.open; });
-    var brands = Object.keys(g).sort(function(a,b){ return g[b]-g[a] || a.localeCompare(b); });
-    return '<h3 class="ijp-h">Select the brand you want to work with</h3>'+
-      '<div class="ijp-tiles">'+brands.map(function(b){
-        return '<button class="ijp-tile" data-ijp-brand="'+esc(b)+'" aria-label="'+esc(b)+'">'+ijpPlate(b)+'</button>';
-      }).join('')+'</div>';
-  }
-  var br = rows.filter(function(r){ return r.brand===s.brand; });
-  var byState = {};
-  br.forEach(function(r){ byState[r.state] = (byState[r.state]||0) + r.open; });
+  var s = ijpS(), rows = ijpRows(), g = {}, byState = {}, total = 0;
+  rows.forEach(function(r){ g[r.brand] = (g[r.brand]||0) + r.open; });
+  var brands = Object.keys(g).sort(function(a,b){ return g[b]-g[a] || a.localeCompare(b); });
+  if(s.brand && !g[s.brand]) s.brand = '';
+  rows.filter(function(r){ return !s.brand || r.brand===s.brand; }).forEach(function(r){ byState[r.state] = (byState[r.state]||0) + r.open; total += r.open; });
   var states = Object.keys(byState).sort(function(a,b){ return byState[b]-byState[a] || a.localeCompare(b); });
-  var total = br.reduce(function(t,r){ return t+r.open; },0);
-  var h = '<div class="ijp-picked">'+ijpPlate(s.brand,true)+
-      '<div><div class="cap">Selected brand</div><div class="nm">'+esc(s.brand)+'</div></div>'+
-      '<button class="iconbtn" data-ijp-change>Change brand</button></div>'+
-    '<h3 class="ijp-h">Which state do you want to work with?</h3>'+
-    '<div class="ijp-chips"><button class="ijp-chip" aria-pressed="'+(s.state==='')+'" data-ijp-state="__all">All states<small>'+ijpNum(total)+'</small></button>'+
-      states.map(function(st){ return '<button class="ijp-chip" aria-pressed="'+(s.state===st)+'" data-ijp-state="'+esc(st)+'">'+esc(st)+'<small>'+ijpNum(byState[st])+'</small></button>'; }).join('')+'</div>';
-  if(s.state===null) return h + '<p class="ijp-hint">Pick a state to see its openings.</p>';
-  h += '<h3 class="ijp-h ijp-res">'+esc(s.brand)+' Openings in '+esc(s.state||'all states')+'</h3>'+
-    '<div class="toolbar"><input id="ijpQ" placeholder="Search a location" value="'+esc(s.q)+'"></div>'+
+  if(s.state && !byState[s.state]) s.state = '';
+  var all = rows.reduce(function(t,r){ return t+r.open; },0);
+  return '<div class="ijp-filters">'+
+      '<div class="f"><label for="ijpBrand">Brand</label><select id="ijpBrand"><option value="">All brands ('+ijpNum(all)+')</option>'+
+        brands.map(function(b){ return '<option value="'+esc(b)+'"'+(s.brand===b?' selected':'')+'>'+esc(b)+' ('+ijpNum(g[b])+')</option>'; }).join('')+'</select></div>'+
+      '<div class="f"><label for="ijpState">State</label><select id="ijpState"><option value="">All states ('+ijpNum(total)+')</option>'+
+        states.map(function(st){ return '<option value="'+esc(st)+'"'+(s.state===st?' selected':'')+'>'+esc(st)+' ('+ijpNum(byState[st])+')</option>'; }).join('')+'</select></div></div>'+
+    '<h3 class="ijp-h ijp-res">'+esc(s.brand||'All brands')+' openings in '+esc(s.state||'all states')+'</h3>'+
+    '<div class="toolbar"><input id="ijpQ" placeholder="Search a location" aria-label="Search a location" value="'+esc(s.q)+'"></div>'+
     '<div id="ijpList"></div><div id="ijpMore" class="ijp-more" hidden><button class="btn sec" data-ijp-more>Show more</button></div>';
-  return h;
 }
 
 function ijpRowHTML(r){
   var mine = ijpMineFor(r.code);
-  return '<div class="ijp-row"><div class="ijp-main"><div class="n">'+esc(r.name)+'</div><div class="m">'+esc(r.state)+'</div></div>'+
+  return '<div class="ijp-row"><div class="ijp-main"><div class="n">'+esc(r.name)+'</div><div class="m">'+esc(r.brand)+' · '+esc(r.state)+'</div></div>'+
     '<div class="ijp-open'+(r.open>=IJP_HOT?' hot':'')+'"><b>'+r.open+'</b><span>open</span></div>'+
     '<div class="ijp-act">'+(mine
       ? '<span class="pill closed">Applied</span><button class="ijp-link" data-ijp-withdraw="'+esc(mine.id)+'">Withdraw</button>'
@@ -1781,7 +1853,7 @@ function ijpPaintList(){
   var s = ijpS(), box = $('ijpList'); if(!box) return;
   var q = s.q.trim().toLowerCase();
   var list = ijpRows().filter(function(r){
-    return r.brand===s.brand && (s.state==='' || r.state===s.state) && (!q || r.name.toLowerCase().indexOf(q)!==-1);
+    return (!s.brand || r.brand===s.brand) && (!s.state || r.state===s.state) && (!q || r.name.toLowerCase().indexOf(q)!==-1);
   }).sort(function(a,b){ return b.open-a.open || a.name.localeCompare(b.name); });
   box.innerHTML = list.length ? list.slice(0, s.limit).map(ijpRowHTML).join('') : '<div class="empty">No openings match your search.</div>';
   $('ijpMore').hidden = list.length <= s.limit;
@@ -1844,9 +1916,8 @@ function ijpWithdrawModal(id){
 // ---- events ----
 function bindIjp(){
   var v = $('view'), s = ijpS();
-  [].forEach.call(v.querySelectorAll('[data-ijp-brand]'),function(b){ b.onclick=function(){ s.brand=b.dataset.ijpBrand; s.state=null; s.q=''; s.limit=IJP_PAGE; render(); window.scrollTo(0,0); }; });
-  [].forEach.call(v.querySelectorAll('[data-ijp-change]'),function(b){ b.onclick=function(){ s.brand=''; s.state=null; s.q=''; s.limit=IJP_PAGE; render(); window.scrollTo(0,0); }; });
-  [].forEach.call(v.querySelectorAll('[data-ijp-state]'),function(b){ b.onclick=function(){ s.state = b.dataset.ijpState==='__all' ? '' : b.dataset.ijpState; s.q=''; s.limit=IJP_PAGE; render(); var t=document.querySelector('.ijp-res'); if(t) t.scrollIntoView({block:'start'}); }; });
+  if($('ijpBrand')) $('ijpBrand').onchange = function(){ s.brand=this.value; s.state=''; s.limit=IJP_PAGE; render(); $('ijpBrand').focus(); };
+  if($('ijpState')) $('ijpState').onchange = function(){ s.state=this.value; s.limit=IJP_PAGE; render(); $('ijpState').focus(); };
   [].forEach.call(v.querySelectorAll('[data-ijp-withdraw]'),function(b){ b.onclick=function(){ ijpWithdrawModal(b.dataset.ijpWithdraw); }; });
   [].forEach.call(v.querySelectorAll('[data-ijp-status]'),function(sel){ sel.onchange=function(){ if(readOnly()) return; IjpStore.setStatus(sel.dataset.ijpStatus, sel.value); toast('Status updated'); }; });
   if($('ijpQ')) $('ijpQ').oninput = function(){ s.q=this.value; s.limit=IJP_PAGE; ijpPaintList(); };
@@ -1880,6 +1951,7 @@ function bindView(){
   if(ui.view==='offergen') bindOfferGen();
   if(ui.view==='ats') bindAts();
   if(ui.view==='ijp') bindIjp();
+  if(ui.view==='referral') bindReferral();
   $('profileBtn').classList.toggle('active', ui.view==='profile');
   $('navHome').classList.toggle('active', ui.view==='home');
   $('navTickets').classList.toggle('active', ui.view==='helpdesk'||ui.view==='ticket');
