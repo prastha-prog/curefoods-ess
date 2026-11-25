@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3XuLcxwxdzL3OzqFr84YHgc6D5vi2L6BdjIbICQDLko='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MATEZWEhIsJNaGoAjvHwSZwpxfSGzqFymkpOxnuTYhU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -1501,7 +1501,7 @@ function go(view, opts){
   if(opts.tab) ui.tab=opts.tab;
   if(opts.ticketId) ui.ticketId=opts.ticketId;
   render(); window.scrollTo(0,0);
-  if(LIVE && me && ['home','helpdesk','ticket','ijp','actions'].indexOf(view)!==-1 && Date.now()-lastSync>20000) boot().then(render).catch(function(){});
+  if(LIVE && me && ['home','helpdesk','ticket','ijp','actions','reports'].indexOf(view)!==-1 && Date.now()-lastSync>20000) boot().then(render).catch(function(){});
 }
 
 function render(){
@@ -1520,6 +1520,7 @@ function render(){
   else if(ui.view==='slip') v.innerHTML = payslipViewHTML();
   else if(ui.view==='ijp') v.innerHTML = ijpHTML();
   else if(ui.view==='actions') v.innerHTML = actionsHTML();
+  else if(ui.view==='reports' && rpOK()) v.innerHTML = reportsHTML();
   else if(ui.view==='referral') v.innerHTML = referralHTML();
   bindView();
 }
@@ -1635,6 +1636,75 @@ function actLoad(){
   api({action:'referrals', session:session()}).then(function(r){ if(ui.view!=='actions') return; if(r.ok) ui.ref=r; actPaint(); }).catch(function(){ if(ui.view==='actions') actPaint(); });
 }
 
+/* ===================== REPORTS: helpdesk, referrals, recruitment ===================== */
+// Only what the server already lets this person see is counted: HR Head / admins get the organisation, HR managers their own queue.
+function rpOK(){ return !!(me && (isHR(me) || me['Is Admin']) && !impState()); }
+function rpS(){ if(!ui.rp) ui.rp={tab:'helpdesk', days:90, ref:null, ats:null, err:''}; return ui.rp; }
+function rpSince(){ var d=rpS().days; return d ? Date.now()-d*86400000 : 0; }
+function rpCount(list, key){ var o={}; list.forEach(function(x){ var k=key(x)||'Not set'; o[k]=(o[k]||0)+1; }); return Object.keys(o).map(function(k){ return [k,o[k]]; }).sort(function(a,b){ return b[1]-a[1]; }); }
+function rpBars(title, rows){
+  var max=rows.reduce(function(m,r){ return Math.max(m,r[1]); },0);
+  return '<div class="panel" style="margin-bottom:12px"><div class="note" style="margin-bottom:8px">'+esc(title)+'</div>'+(rows.length ? rows.map(function(r){
+    return '<div style="display:grid;grid-template-columns:minmax(90px,38%) 1fr 36px;gap:8px;align-items:center;margin:6px 0;font-size:13px"><span>'+esc(r[0])+'</span><span style="background:var(--line-soft);border-radius:6px;height:10px;overflow:hidden"><span style="display:block;height:10px;width:'+(max?Math.round(100*r[1]/max):0)+'%;background:var(--sapphire)"></span></span><b style="text-align:right">'+r[1]+'</b></div>'; }).join('') : '<p class="hint" style="margin:0">Nothing in this period.</p>')+'</div>';
+}
+function rpTiles(t){ return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px">'+t.map(function(x){ return atsStat(x[0],x[1],x[2]); }).join('')+'</div>'; }
+function rpDay(x){ if(!x) return ''; var d=new Date(x); return isNaN(d) ? '' : d.toISOString().slice(0,10); }
+function rpCell(v){ var t=String(v==null?'':v); if(/^[=+\-@\t\r]/.test(t)) t="'"+t; return '"'+t.replace(/"/g,'""')+'"'; }   // no spreadsheet formulas from typed text
+function rpCsv(name, head, rows){
+  var csv='﻿'+[head].concat(rows).map(function(r){ return r.map(rpCell).join(','); }).join('\r\n');
+  var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=name+' '+rpDay(Date.now())+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+function rpData(){
+  var st=rpS(), since=rpSince(), now=Date.now(), H=3600000, SLA=SLA_HOURS*H;
+  if(st.tab==='helpdesk'){
+    var t=TICKETS.filter(function(x){ return x.createdAt>=since; }), open=t.filter(function(x){ return x.status!=='Closed'; }), closed=t.filter(function(x){ return x.status==='Closed'&&x.closedAt; });
+    var late=open.filter(function(x){ return now-x.createdAt>SLA; }), inSla=closed.filter(function(x){ return x.closedAt-x.createdAt<=SLA; });
+    var avg=closed.length ? Math.round(closed.reduce(function(n,x){ return n+(x.closedAt-x.createdAt); },0)/closed.length/H) : null;
+    return { tiles:[['Raised',t.length,''],['Open',open.length,late.length?late.length+' past '+SLA_HOURS+' hours':'none overdue'],['Closed',closed.length,closed.length?Math.round(100*inSla.length/closed.length)+'% within '+SLA_HOURS+' hours':''],['Average to close',avg==null?'–':avg+' h','']],
+      bars:[['By category',rpCount(t,function(x){ return x.category; })],['Open, by owner',rpCount(open,function(x){ return nameOf(x.assignedTo); })],
+        ['Open, by age',[['Up to 2 days',open.filter(function(x){ return now-x.createdAt<=SLA; }).length],['3 to 4 days',open.filter(function(x){ var a=now-x.createdAt; return a>SLA&&a<=2*SLA; }).length],['Over 4 days',open.filter(function(x){ return now-x.createdAt>2*SLA; }).length]]]],
+      file:'Helpdesk tickets', head:['Ticket','Category','Status','Raised by','Assigned to','Raised on','Closed on','Hours to close'],
+      rows:t.map(function(x){ return [x.id,x.category,x.status,nameOf(x.raisedBy),nameOf(x.assignedTo),rpDay(x.createdAt),rpDay(x.closedAt),x.closedAt?Math.round((x.closedAt-x.createdAt)/H):'']; }) };
+  }
+  if(st.tab==='referrals'){
+    var r=(st.ref||[]).filter(function(x){ return x.at>=since; }), by=function(v){ return r.filter(function(x){ return x.status===v; }); };
+    var ap=by('Approved').length, rj=by('Rejected').length, done=r.filter(function(x){ return x.decidedAt; });
+    var days=done.length ? (done.reduce(function(n,x){ return n+(x.decidedAt-x.at); },0)/done.length/86400000).toFixed(1) : null;
+    return { tiles:[['Referrals',r.length,''],['Pending',by('Pending').length,'awaiting approval'],['Approved',ap,(ap+rj)?Math.round(100*ap/(ap+rj))+'% of those decided':''],['Rejected',rj,''],['Average to decide',days==null?'–':days+' days','']],
+      bars:[['By brand',rpCount(r,function(x){ return x.brand; })],['By designation',rpCount(r,function(x){ return x.designation; }).slice(0,8)],['Top referrers',rpCount(r,function(x){ return x.by||nameOf(x.raisedBy); }).slice(0,8)]],
+      file:'Referrals', head:['Referral','Candidate','Phone','Designation','Brand','Location','Referred by','Status','Raised on','Decided on'],
+      rows:r.map(function(x){ return [x.id,x.name,x.phone,x.designation,x.brand,x.location,x.by||nameOf(x.raisedBy),x.status,rpDay(x.at),rpDay(x.decidedAt)]; }) };
+  }
+  var d=st.ats||{jobs:[],candidates:[],interviews:[],stages:[]}, c=d.candidates.filter(function(x){ return !since || Date.parse(x.appliedAt)>=since; });
+  var inStage=function(v){ return c.filter(function(x){ return x.stage===v; }).length; }, iso=new Date().toISOString().slice(0,16);
+  return { tiles:[['Open jobs',d.jobs.filter(function(j){ return j.status==='Open'; }).length,'now'],['Applications',c.length,''],['In pipeline',c.length-inStage('Rejected')-inStage('Hired'),''],['Offers',inStage('Offer'),''],['Hired',inStage('Hired'),c.length?Math.round(100*inStage('Hired')/c.length)+'% of applications':''],['Interviews to come',d.interviews.filter(function(i){ return i.status==='Scheduled'&&i.when>=iso; }).length,'now']],
+    bars:[['Candidates by stage',d.stages.map(function(x){ return [x,inStage(x)]; })],['By job',rpCount(c,function(x){ return x.jobTitle; }).slice(0,10)],['By source',rpCount(c,function(x){ return x.source; })]],
+    file:'Recruitment candidates', head:['Candidate id','Name','Job','Stage','Source','Applied on','Email','Phone'],
+    rows:c.map(function(x){ return [x.id,x.name,x.jobTitle,x.stage,x.source,rpDay(x.appliedAt),x.email,x.phone]; }) };
+}
+function reportsHTML(){
+  return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Reports</h2></div><div class="tabs" id="rpTabs"></div>'+
+    '<div class="row" style="margin:0 0 12px;gap:10px"><select id="rpDays" aria-label="Period"><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option><option value="0">All time</option></select><button class="btn sec" id="rpDl" type="button">Download CSV</button></div><div id="rpBody"><div class="empty">Loading…</div></div>';
+}
+function rpPaint(){
+  if(ui.view!=='reports') return; var st=rpS();
+  $('rpTabs').innerHTML=[['helpdesk','Helpdesk'],['referrals','Referrals'],['recruitment','Recruitment']].map(function(t){ return '<button class="tab'+(t[0]===st.tab?' active':'')+'" data-rp="'+t[0]+'">'+t[1]+'</button>'; }).join('');
+  [].forEach.call($('rpTabs').querySelectorAll('[data-rp]'),function(b){ b.onclick=function(){ st.tab=b.dataset.rp; rpPaint(); }; });
+  $('rpDays').value=String(st.days); $('rpDays').onchange=function(){ st.days=Number(this.value); rpPaint(); };
+  var waiting = (st.tab==='referrals'&&!st.ref) || (st.tab==='recruitment'&&!st.ats), d=rpData();
+  $('rpDl').disabled = waiting || !d.rows.length; $('rpDl').onclick=function(){ rpCsv(d.file, d.head, d.rows); };
+  $('rpBody').innerHTML = waiting ? '<div class="empty">'+esc(st.err||'Loading…')+'</div>' : rpTiles(d.tiles)+d.bars.map(function(b){ return rpBars(b[0],b[1]); }).join('');
+}
+function rpLoad(){
+  var st=rpS(); st.err='';
+  if(!LIVE){ st.ref=[]; st.ats=null; return rpPaint(); }
+  var fail=function(){ st.err='Could not reach the server.'; rpPaint(); };
+  api({action:'referrals', session:session()}).then(function(r){
+    if(!r.ok){ st.err=r.error||'Could not load referrals.'; return rpPaint(); }
+    var seen={}; st.ref=(r.all || (r.toApprove||[]).concat(r.mine||[])).filter(function(x){ if(seen[x.id]) return false; return seen[x.id]=true; }); rpPaint(); }).catch(fail);
+  api({action:'atsBootstrap', session:session()}).then(function(r){ if(r.ok) st.ats=r; else st.err=r.error||'Could not load recruitment.'; rpPaint(); }).catch(fail);
+}
+
 function homeHTML(){
   var count = isHR(me) ? hrPending().length : myOpen().length;
   var sub = isHR(me) ? (count+' pending action'+(count===1?'':'s')) : (count ? count+' open ticket'+(count===1?'':'s') : 'Payroll, leave, documents & more');
@@ -1647,6 +1717,7 @@ function homeHTML(){
       '<button class="mcard" data-go="offer"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">My Offer Letter</div><div class="s">View your offer letter</div></div></button>'+
       '<button class="mcard" data-go="ijp"><div class="ic">'+ICON_JOB+'</div><div><div class="t">Internal Job Posting</div><div class="s">Open roles for returning employees</div></div></button>'+
       (LIVE && !impState() ? '<button class="mcard" data-go="referral"><div class="ic">'+ICON_REF+'</div><div><div class="t">Refer a Candidate</div><div class="s">Refer someone for a role at Curefoods</div></div></button>' : '')+
+      (rpOK() ? '<button class="mcard" data-go="reports"><div class="ic">'+ICON_ATS+'</div><div><div class="t">Reports</div><div class="s">Helpdesk, referrals, recruitment</div></div></button>' : '')+
       (atsOK() ? '<button class="mcard" data-go="ats"><div class="ic">'+ICON_ATS+'</div><div><div class="t">Recruitment</div><div class="s">Jobs, candidates, interviews</div></div></button>' : '')+
       (canOffer(me) && !impState() ? '<button class="mcard" data-go="offergen"><div class="ic">'+ICON_OFFER+'</div><div><div class="t">Generate Letters</div><div class="s">Create and email letters</div></div></button>' : '')+
       (isNaps(me) ? '<button class="mcard" data-go="payslips"><div class="ic">'+ICON_SLIP+'</div><div><div class="t">Payslips</div><div class="s">Monthly payslips & stipend slips</div></div></button>' : '')+
@@ -2015,6 +2086,7 @@ function bindView(){
   if(ui.view==='ats') bindAts();
   if(ui.view==='ijp') bindIjp();
   if(ui.view==='actions'){ actPaint(); actLoad(); }
+  if(ui.view==='reports' && rpOK()){ rpPaint(); rpLoad(); }
   if(ui.view==='referral') bindReferral();
   $('profileBtn').classList.toggle('active', ui.view==='profile');
   $('navHome').classList.toggle('active', ui.view==='home');
