@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MATEZWEhIsJNaGoAjvHwSZwpxfSGzqFymkpOxnuTYhU='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-M55GNZ8NNqQMN5m6ylH1rxsy0tSVWnC1pL9eHhLJWwI='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -9,6 +9,8 @@
 /* accessibility */
 :focus-visible{outline:2px solid var(--sapphire); outline-offset:2px}
 .modal:focus{outline:none}
+#navTickets{position:relative}
+.bn .nbadge{position:absolute;top:2px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#c62828;color:#fff;font:700 11px/17px var(--mono);font-style:normal;text-align:center}
 </style></head><body>
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -543,18 +545,20 @@ function applyBoot(b){
   TICKETS=b.tickets||[]; PEOPLE=b.people||{}; HR_LIST=b.hrs||[]; SNAP={};
   TICKETS.forEach(function(t){ SNAP[t.id]=JSON.stringify(t); });
   IjpStore.set(b.ijpApps||[]); lastSync=Date.now(); ATS_ACCESS=b.ats||null;
+  ui.ref=b.ref||null; ui.rp=null;   // never carry one person's lists into the next sign-in
 }
-function boot(){
-  return Promise.all([api({action:'bootstrap', session:session()}), api({action:'ijpOpenings', session:session()})]).then(function(rs){
+function boot(pre){
+  var data = pre && pre.boot && pre.openings ? Promise.resolve([pre.boot, pre.openings]) : Promise.all([api({action:'bootstrap', session:session()}), api({action:'ijpOpenings', session:session()})]);
+  return data.then(function(rs){
     if(!rs[0].ok) throw new Error('boot');
     applyBoot(rs[0]);
     if(rs[1].ok){ IJP_ROWS=rs[1].rows; IJP_AS_OF=rs[1].asOf||IJP_AS_OF; }
   });
 }
-function enter(emp){
+function enter(emp, pre){
   if(LIVE){
     var local=lookup(emp['Employee Code']); if(local){ for(var k in emp) local[k]=emp[k]; emp=local; } else EMPLOYEE_MASTER.push(emp);
-    return boot().then(function(){ startApp(emp); }).catch(function(){ toast('Could not load your data. Please try again.'); });
+    return boot(pre).then(function(){ startApp(emp); }).catch(function(){ toast('Could not load your data. Please try again.'); });
   }
   startApp(emp);
 }
@@ -577,7 +581,7 @@ $('pinBtn').onclick = function(){
   if(pin.length!==4) return err('pinError','Enter your 4-digit PIN.');
   var btn=$('pinBtn'); busy(btn,true,'Signing in…');
   Auth.loginPin(s.empCode,pin).then(function(r){
-    if(r.ok) return enter(r.employee);
+    if(r.ok) return enter(r.employee, r);
     clearPins('pin');
     err('pinError', r.error || ('Incorrect PIN. '+r.left+' attempt'+(r.left===1?'':'s')+' left before the ID is locked.'));
   }).catch(netFail('pinError')).then(function(){ busy(btn,false,'Sign in'); });
@@ -608,7 +612,7 @@ $('setBtn').onclick = function(){
   var btn=$('setBtn'); busy(btn,true,'Saving…');
   Auth.setPin(s.setupToken,a).then(function(r){
     if(!r.ok) return err('setError', r.error);
-    s.setupToken=null; toast('PIN set. Use it with your Employee ID next time.'); enter(r.employee);
+    s.setupToken=null; toast('PIN set. Use it with your Employee ID next time.'); enter(r.employee, r);
   }).catch(netFail('setError')).then(function(){ busy(btn,false,'Set PIN & sign in'); });
 };
 
@@ -1608,12 +1612,20 @@ function actItems(){
   });
   return items.sort(function(a,b){ return b.at-a.at; });
 }
+function actBadge(){
+  var b=$('navTickets'); if(!b || !me) return;
+  var n=actItems().filter(function(i){ return i.kind==='approval'; }).length, el=b.querySelector('.nbadge');
+  if(!n){ if(el) el.remove(); b.setAttribute('aria-label','Actions'); return; }
+  if(!el){ el=document.createElement('i'); el.className='nbadge'; b.appendChild(el); }
+  el.textContent=n>99?'99+':n; b.setAttribute('aria-label','Actions, '+n+' waiting for your approval');
+}
 function actionsHTML(){
   return '<div class="crumb"><button class="iconbtn" data-go="home">'+ICON_BACK+'</button><h2>Actions</h2></div>'+
     '<div class="tabs" id="actTabs"></div><div id="actList"><div class="empty">Loading…</div></div>'+
     '<div style="margin-top:14px"><button class="btn sec" data-go="helpdesk" type="button">Open helpdesk</button></div>';
 }
 function actPaint(){
+  actBadge();
   var all=actItems(), tab=ui.actTab||'all', cnt={all:all.length, approval:0, update:0};
   all.forEach(function(i){ if(cnt[i.kind]!=null) cnt[i.kind]++; });
   $('actTabs').innerHTML=[['all','Notifications'],['approval','Approvals'],['update','Updates']].map(function(t){
@@ -2091,6 +2103,7 @@ function bindView(){
   $('profileBtn').classList.toggle('active', ui.view==='profile');
   $('navHome').classList.toggle('active', ui.view==='home');
   $('navTickets').classList.toggle('active', ui.view==='helpdesk'||ui.view==='ticket'||ui.view==='actions');
+  actBadge();
   if(ui.view==='helpdesk' && ui.tab==='raise') bindRaise();
   if(ui.view==='ticket') bindTicket();
 }
