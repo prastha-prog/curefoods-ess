@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-rFRmZ1OEiGS47DkrGhXoIOviHs+mTXcNulizUI9wfbk='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3XuLcxwxdzL3OzqFr84YHgc6D5vi2L6BdjIbICQDLko='; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: blob:; connect-src https://script.google.com https://script.googleusercontent.com; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'"><meta name="referrer" content="no-referrer"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
 /* polish */
 .lhint:empty{display:none}
 .ijp-main .n{color:var(--ink)}
@@ -983,8 +983,16 @@ function offerGenHTML(){
   if(og.cfg.error) return h+'<div class="panel"><div class="note">'+esc(og.cfg.error)+'</div></div>';
   return h + (og.step==='preview' ? ogPreviewHTML() : ogFormHTML());
 }
+function ogNeed(entity,t){
+  var cfi=entity==='CFI', base='name doj phone email cc net';
+  var f = t==='Full Time Offer' ? 'desig state dob addr' + (cfi?' alt paddr mgr':'') + (['ME','YP','SB'].indexOf(entity)>=0?' loc':'')
+        : t==='NAPS LOI' ? 'dbt' + (cfi?' state':' loc desig')
+        : t==='BVoc LOI' ? (cfi?'state sal':'loc' + (entity==='ME'?'':' state'))
+        : t==='Consultant Agreement' ? 'pan addr' : 'desig addr';
+  var o={}; (base+' '+f).split(' ').forEach(function(k){ o[k]=true; }); return o;
+}
 function ogFormHTML(){
-  var og=ogS(), v=og.v, ent=ogEnt(), t=og.type, c=og.cfg, h='<div class="panel">', FT=t==='Full Time Offer', NAPS=t==='NAPS LOI', BV=t==='BVoc LOI', CA=t==='Consultant Agreement';
+  var og=ogS(), v=og.v, ent=ogEnt(), t=og.type, c=og.cfg, h='<div class="panel">', FT=t==='Full Time Offer', NAPS=t==='NAPS LOI', BV=t==='BVoc LOI', CA=t==='Consultant Agreement', N=ogNeed(og.entity,t);
   h+= c.entities.length>1
     ? ogF('ogEntity','Company','<select id="ogEntity">'+c.entities.map(function(e){ return '<option value="'+esc(e.key)+'"'+(e.key===og.entity?' selected':'')+'>'+esc(e.companyName)+'</option>'; }).join('')+'</select>')
     : '<p class="hint" style="margin:0 0 10px">'+esc(ent.companyName)+'</p>';
@@ -992,24 +1000,25 @@ function ogFormHTML(){
   var opts='<option value="">Select…</option>'+['Unskilled','Skilled'].map(function(g){ return '<optgroup label="'+g+'">'+(c.designations[g]||[]).map(function(d){ return '<option'+(v.desig===d?' selected':'')+'>'+esc(d)+'</option>'; }).join('')+'</optgroup>'; }).join('')+'<option value="__other__"'+(v.desig==='__other__'?' selected':'')+'>Other…</option>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 14px;margin-top:10px">';
   h+=ogF('ogName','Employee name *',ogIn('ogName','text',v.name,'Full name'));
-  h+= CA ? ogF('ogPan','PAN number *',ogIn('ogPan','text',v.pan,'ABCDE1234F',' maxlength="10" autocapitalize="characters"')) : ogF('ogDesig','Designation *','<select id="ogDesig">'+opts+'</select>');
-  if(!CA && v.desig==='__other__'){
+  if(N.pan) h+=ogF('ogPan','PAN number *',ogIn('ogPan','text',v.pan,'ABCDE1234F',' maxlength="10" autocapitalize="characters"'));
+  if(N.desig) h+=ogF('ogDesig','Designation *','<select id="ogDesig">'+opts+'</select>');
+  if(N.desig && v.desig==='__other__'){
     h+=ogF('ogCustom','Custom designation *',ogIn('ogCustom','text',v.custom,'e.g. Shift Lead'));
     h+=ogF('ogCat','Minimum wage category *','<select id="ogCat"><option value="">Select…</option><option'+(v.cat==='Unskilled'?' selected':'')+'>Unskilled</option><option'+(v.cat==='Skilled'?' selected':'')+'>Skilled</option></select>');
   }
-  h+=ogF('ogState','State'+(FT?' *':''),'<select id="ogState"><option value="">Select…</option>'+c.states.map(function(x){ return '<option'+(v.state===x?' selected':'')+'>'+esc(x)+'</option>'; }).join('')+'</select>');
+  if(N.state) h+=ogF('ogState','State *','<select id="ogState"><option value="">Select…</option>'+c.states.map(function(x){ return '<option'+(v.state===x?' selected':'')+'>'+esc(x)+'</option>'; }).join('')+'</select>');
   h+=ogF('ogDoj','Date of joining *',ogIn('ogDoj','date',v.doj));
-  h+=ogF('ogDob','Date of birth',ogIn('ogDob','date',v.dob));
-  h+=ogF('ogLoc','Kitchen location',ogIn('ogLoc','text',v.loc,'e.g. Indiranagar, Bengaluru'));
+  if(N.dob) h+=ogF('ogDob','Date of birth',ogIn('ogDob','date',v.dob));
+  if(N.loc) h+=ogF('ogLoc','Kitchen location *',ogIn('ogLoc','text',v.loc,'e.g. Indiranagar, Bengaluru'));
   h+=ogF('ogPhone','Phone number *',ogIn('ogPhone','tel',v.phone,'10-digit mobile',' inputmode="numeric"'));
-  h+=ogF('ogAlt','Alternate contact number',ogIn('ogAlt','tel',v.alt,'Optional',' inputmode="numeric"'));
+  if(N.alt) h+=ogF('ogAlt','Alternate contact number',ogIn('ogAlt','tel',v.alt,'Optional',' inputmode="numeric"'));
   h+=ogF('ogEmail','Candidate email *',ogIn('ogEmail','email',v.email,'candidate@email.com'));
   h+=ogF('ogCc','CC email',ogIn('ogCc','text',v.cc,'Optional, comma separated'));
-  h+=ogF('ogMgr','Manager name',ogIn('ogMgr','text',v.mgr,'Reporting manager'));
-  if(BV) h+=ogF('ogSal','Salutation','<select id="ogSal"><option value="">Select…</option>'+['Mr','Ms','Mrs','Dr'].map(function(x){ return '<option'+(v.sal===x?' selected':'')+'>'+x+'</option>'; }).join('')+'</select>');
-  h+=ogF('ogAddr','Current address *','<textarea id="ogAddr" rows="2">'+esc(v.addr||'')+'</textarea>',true);
-  h+=ogF('ogPaddr','Permanent address','<textarea id="ogPaddr" rows="2" placeholder="If different from current">'+esc(v.paddr||'')+'</textarea>',true);
-  h+=ogF('ogNet', FT?'Desired net take-home (₹/month) *':CA?'Consultant fee (₹) *':NAPS?'NET salary (₹/month) *':'NET salary / stipend (₹/month) *', ogIn('ogNet','number',v.net,FT?'e.g. 20300':'',' min="1"'));
+  if(N.mgr) h+=ogF('ogMgr','Manager name',ogIn('ogMgr','text',v.mgr,'Reporting manager'));
+  if(N.sal) h+=ogF('ogSal','Salutation *','<select id="ogSal"><option value="">Select…</option>'+['Mr','Ms','Mrs','Dr'].map(function(x){ return '<option'+(v.sal===x?' selected':'')+'>'+x+'</option>'; }).join('')+'</select>');
+  if(N.addr) h+=ogF('ogAddr','Current address *','<textarea id="ogAddr" rows="2">'+esc(v.addr||'')+'</textarea>',true);
+  if(N.paddr) h+=ogF('ogPaddr','Permanent address','<textarea id="ogPaddr" rows="2" placeholder="If different from current">'+esc(v.paddr||'')+'</textarea>',true);
+  h+=ogF('ogNet', FT?'Desired net take-home (₹/month) *':CA?'Consultant fee (₹) *':NAPS?'Total stipend (₹/month) *':'Stipend (₹/month) *', ogIn('ogNet','number',v.net,FT?'e.g. 20300':'',' min="1"'));
   if(NAPS) h+=ogF('ogDbt','DBT amount (₹/month) *',ogIn('ogDbt','number',v.dbt,'e.g. 1500',' min="1"'));
   h+='</div>';
   if(FT) h+='<label style="display:flex;gap:10px;align-items:center;margin:4px 0"><input type="checkbox" id="ogPtOn"'+(v.ptOn?' checked':'')+'> <span>Use a fixed Professional Tax amount instead of the state slab</span></label>'+(v.ptOn?ogF('ogPt','Fixed PT (₹/month)',ogIn('ogPt','number',v.pt==null?200:v.pt,'',' min="0"')):'');
@@ -1021,7 +1030,7 @@ function ogPreviewHTML(){
   var og=ogS(), v=og.v, ent=ogEnt(), t=og.type, r=og.sal ? (og.choice==='alternate'&&og.sal.alternate ? og.sal.alternate : og.sal.primary) : null;
   var h='<div class="panel"><div class="note">Check the details. When you confirm, the offer letter is created and <b>emailed to '+esc(v.email)+'</b> straight away.</div>';
   h+='<div class="dgrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 14px;margin:12px 0">'+
-    [['Company',ent.companyName],['Letter',t],['Name',v.name],t==='Consultant Agreement'?['PAN',String(v.pan||'').toUpperCase()]:['Designation',v.desig==='__other__'?v.custom:v.desig],['State',v.state],['Joining',dLong(v.doj)],['Phone',v.phone],['Email',v.email],['CC',v.cc]].filter(function(x){ return x[1]; }).map(function(x){ return '<div><span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-faint)">'+x[0]+'</span><div><b>'+esc(x[1])+'</b></div></div>'; }).join('')+'</div>';
+    [['Company',ent.companyName],['Letter',t],['Name',v.name],['PAN',ogNeed(og.entity,t).pan?String(v.pan||'').toUpperCase():''],['Designation',ogNeed(og.entity,t).desig?(v.desig==='__other__'?v.custom:v.desig):''],['Kitchen',ogNeed(og.entity,t).loc?v.loc:''],['State',ogNeed(og.entity,t).state?v.state:''],['Joining',dLong(v.doj)],['Phone',v.phone],['Email',v.email],['CC',v.cc]].filter(function(x){ return x[1]; }).map(function(x){ return '<div><span style="font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-faint)">'+x[0]+'</span><div><b>'+esc(x[1])+'</b></div></div>'; }).join('')+'</div>';
   if(r){
     if(og.sal.alternate){
       var alt = og.sal.primaryLabel && og.sal.primaryLabel.indexOf('Below')===0 ? 'Above ₹21,000 wage threshold: no bonus or ESIC' : 'Below ₹21,000 wage threshold: bonus and ESIC active';
@@ -1046,24 +1055,31 @@ function ogCollect(){
   Object.keys(m).forEach(function(k){ var x=g(m[k]); if(x!==undefined) v[k]=x; });
 }
 function ogFd(){
-  var og=ogS(), v=og.v;
+  var og=ogS(), N=ogNeed(og.entity,og.type), v={}; Object.keys(og.v).forEach(function(k){ v[k]=og.v[k]; });
+  ['desig','state','dob','loc','alt','mgr','sal','addr','paddr'].forEach(function(k){ if(!N[k]) v[k]=''; });
+  if(!N.desig){ v.custom=''; v.cat=''; }
   return {panNumber:og.type==='Consultant Agreement'?String(v.pan||'').toUpperCase():'', employmentType:og.type, employeeName:v.name, designation:v.desig, customDesignation:v.custom, category:v.cat, dateOfJoining:v.doj, dateOfBirth:v.dob||'', state:v.state||'', kitchenLocation:v.loc||'',
     phoneNumber:v.phone, alternateContactNumber:v.alt||'', email:v.email, cc:v.cc||'', managerName:v.mgr||'', address:v.addr, permanentAddress:v.paddr||'', salutation:v.sal||'',
     ptOverrideEnabled:!!v.ptOn, ptOverrideValue:v.ptOn?Number(v.pt==null?200:v.pt):'', netSalary:Number(v.net)||0, dbtAmount:og.type==='NAPS LOI'?(Number(v.dbt)||0):0};
 }
 function ogValidate(){
-  var og=ogS(), v=og.v, t=og.type;
+  var og=ogS(), v=og.v, t=og.type, N=ogNeed(og.entity,t);
   if(!v.name) return 'Employee name is required.';
-  if(t==='Consultant Agreement'){ if(!/^[A-Za-z]{5}\d{4}[A-Za-z]$/.test(v.pan||'')) return 'Enter a valid PAN (e.g. ABCDE1234F).'; }
-  else if(!v.desig) return 'Designation is required.';
-  if(t!=='Consultant Agreement' && v.desig==='__other__'){ if(!v.custom) return 'Custom designation is required.'; if(!v.cat) return 'Choose the minimum wage category for a custom designation.'; }
+  if(N.pan && !/^[A-Za-z]{5}\d{4}[A-Za-z]$/.test(v.pan||'')) return 'Enter a valid PAN (e.g. ABCDE1234F).';
+  if(N.desig){
+    if(!v.desig) return 'Designation is required.';
+    if(v.desig==='__other__'){ if(!v.custom) return 'Custom designation is required.'; if(!v.cat) return 'Choose the minimum wage category for a custom designation.'; }
+  }
+  if(N.state && !v.state) return 'State is required.';
   if(!v.doj) return 'Date of joining is required.';
+  if(N.loc && !v.loc) return 'Kitchen location is required.';
+  if(N.sal && !v.sal) return 'Salutation is required.';
   if(String(v.phone||'').replace(/\D/g,'').length<10) return 'A 10-digit phone number is required.';
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email||'')) return 'A valid candidate email is required.';
-  if(!v.addr) return 'Current address is required.';
-  if(t==='Full Time Offer'){ if(!v.state) return 'State is required for a Full Time Offer.'; if(!(Number(v.net)>=1000)) return 'Enter a valid net take-home (at least ₹1,000).'; }
-  else if(t==='NAPS LOI'){ if(!(Number(v.net)>=1)) return 'NET salary is required.'; if(!(Number(v.dbt)>=1)) return 'DBT amount is required.'; if(Number(v.dbt)>Number(v.net)) return 'DBT cannot be more than the NET salary.'; }
-  else if(!(Number(v.net)>=1)) return 'NET salary / stipend is required.';
+  if(N.addr && !v.addr) return 'Current address is required.';
+  if(t==='Full Time Offer'){ if(!(Number(v.net)>=1000)) return 'Enter a valid net take-home (at least ₹1,000).'; }
+  else if(!(Number(v.net)>=1)) return t==='Consultant Agreement' ? 'Consultant fee is required.' : 'Stipend is required.';
+  if(N.dbt){ if(!(Number(v.dbt)>=1)) return 'DBT amount is required.'; if(Number(v.dbt)>Number(v.net)) return 'DBT cannot be more than the total stipend.'; }
   return '';
 }
 function bindOfferGen(){
